@@ -64,7 +64,7 @@ body:
         ### Mobile platforms
 
         The places to find the logs on mobile platforms are as follows:
-          - *On Android*, navigate to `Android/data/sh.ppy.osulazer/files/logs` using a file browser app.
+          - *On Android*, navigate to `Android/data/top.g0v0.lazer/files/logs` using a file browser app.
           - *On iOS*, connect your device to a PC and copy the `logs` directory from the app's document storage using iTunes. (https://support.apple.com/en-us/HT201301#copy-to-computer)
 
   - type: textarea
