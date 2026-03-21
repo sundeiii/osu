@@ -15,6 +15,8 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       semver: ${{ steps.version.outputs.semver }}
+      nugetVersion: ${{ steps.version.outputs.nugetVersion }}
+      velopackVersion: ${{ steps.version.outputs.velopackVersion }}
       assemblyVersion: ${{ steps.version.outputs.assemblyVersion }}
       fileVersion: ${{ steps.version.outputs.fileVersion }}
       androidVersionCode: ${{ steps.version.outputs.androidVersionCode }}
@@ -34,12 +36,19 @@ jobs:
           VERSION_NUMBERS=$(echo "$SEMVER" | sed 's/-.*$//' | tr -d '.')
           ANDROID_VERSION_CODE="$VERSION_NUMBERS"
 
+          # nugetVersion uses 3-part version from the tag date (e.g. v2026.321.1-lazer -> 2026.321.1)
+          NUGET_VERSION=$(echo "${SEMVER%%-*}" | awk -F. '{print $1"."$2"."$3}')
+          # Velopack requires 3-part semver without pre-release
+          VELOPACK_VERSION=$(echo "$NUMERIC" | awk -F. '{print $1"."$2"."$3}')
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "semver=$SEMVER" >> $GITHUB_OUTPUT
+          echo "nugetVersion=$NUGET_VERSION" >> $GITHUB_OUTPUT
+          echo "velopackVersion=$VELOPACK_VERSION" >> $GITHUB_OUTPUT
           echo "assemblyVersion=$NUMERIC" >> $GITHUB_OUTPUT
           echo "fileVersion=$NUMERIC" >> $GITHUB_OUTPUT
           echo "androidVersionCode=$ANDROID_VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "Computed version: $VERSION (semver: $SEMVER, assembly/file: $NUMERIC, android: $ANDROID_VERSION_CODE)"
+          echo "Computed version: $VERSION (semver: $SEMVER, nuget: $NUGET_VERSION, velopack: $VELOPACK_VERSION, assembly/file: $NUMERIC, android: $ANDROID_VERSION_CODE)"
 
   nuget:
     name: Pack & Publish NuGet
@@ -60,14 +69,14 @@ jobs:
       - name: Pack
         run: |
           dotnet pack -c Release osu.Game \
-            /p:Version=${{ needs.version.outputs.semver }} \
+            /p:Version=${{ needs.version.outputs.nugetVersion }} \
             /p:GenerateDocumentationFile=true \
             /p:IncludeSymbols=true \
             /p:SymbolPackageFormat=snupkg \
             -o artifacts
 
           dotnet pack -c Release osu.Game.Rulesets.Osu \
-            /p:Version=${{ needs.version.outputs.semver }} \
+            /p:Version=${{ needs.version.outputs.nugetVersion }} \
             /p:GenerateDocumentationFile=true \
             /p:IncludeSymbols=true \
             /p:SymbolPackageFormat=snupkg \
@@ -102,27 +111,23 @@ jobs:
           - os: windows-latest
             runtime: win-x64
             artifact-name: osu-gu-windows
-            executable: osu-gu!.exe
+            executable: "osu!.exe"
           - os: ubuntu-latest
             runtime: linux-x64
             artifact-name: osu-gu-linux
-            executable: osu-gu!
+            executable: "osu!"
           - os: macos-latest
             runtime: osx-x64
             artifact-name: osu-gu-macos-intel
-            executable: osu-gu!
+            executable: "osu!"
           - os: macos-latest
             runtime: osx-arm64
             artifact-name: osu-gu-macos-apple-silicon
-            executable: osu-gu!
+            executable: "osu!"
           - os: ubuntu-latest
             runtime: android
             artifact-name: osu-gu-android
             executable: osu.Android-Signed.apk
-          - os: macos-15
-            runtime: ios
-            artifact-name: osu-gu-ios
-            executable: osu.iOS.app
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -160,17 +165,11 @@ jobs:
           dotnet workload list
           echo "Android SDK Root: $ANDROID_SDK_ROOT"
           echo "Java Home: $JAVA_HOME"
-
-      - name: Install iOS workload (iOS only)
-        if: matrix.runtime == 'ios'
-        run: dotnet workload install ios
-
-      - name: Use Xcode 16.4 (iOS only)
-        if: matrix.runtime == 'ios'
-        run: sudo xcode-select -switch /Applications/Xcode_16.4.app
+          # Ensure required Android platform is installed
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: Install Velopack CLI
-        if: matrix.runtime != 'android' && matrix.runtime != 'ios'
+        if: matrix.runtime != 'android'
         shell: bash
         run: dotnet tool install -g vpk
 
@@ -238,8 +237,6 @@ jobs:
           echo "Cleaning previous build artifacts for ${{ matrix.runtime }}"
           if [[ "${{ matrix.runtime }}" == "android" ]]; then
             rm -rf osu.Android/bin osu.Android/obj
-          elif [[ "${{ matrix.runtime }}" == "ios" ]]; then
-            rm -rf osu.iOS/bin osu.iOS/obj
           else
             rm -rf osu.Desktop/bin osu.Desktop/obj
           fi
@@ -252,11 +249,6 @@ jobs:
           echo "Restoring packages for runtime: ${{ matrix.runtime }}"
           if [[ "${{ matrix.runtime }}" == "android" ]]; then
             dotnet restore osu.Android/osu.Android.csproj \
-              --verbosity normal \
-              --no-cache \
-              --force
-          elif [[ "${{ matrix.runtime }}" == "ios" ]]; then
-            dotnet restore osu.iOS/osu.iOS.csproj \
               --verbosity normal \
               --no-cache \
               --force
@@ -347,7 +339,7 @@ jobs:
               -p:ApplicationDisplayVersion=${{ needs.version.outputs.semver }} \
               -p:AndroidSdkDirectory=$ANDROID_SDK_ROOT \
               -p:AndroidKeyStore=true \
-              -p:AndroidSigningKeyStore=../osu.keystore \
+              -p:AndroidSigningKeyStore=$(pwd)/osu.keystore \
               -p:AndroidSigningKeyAlias="$KEY_ALIAS" \
               -p:AndroidSigningKeyPass="$KEY_PASS" \
               -p:AndroidSigningStorePass="$KEYSTORE_PASS" \
@@ -368,24 +360,6 @@ jobs:
               echo "Verifying APK signature..."
               aapt2 dump badging "publish/${{ matrix.runtime }}/${{ matrix.executable }}" | grep -E "application-label|package" || true
             fi
-          elif [[ "${{ matrix.runtime }}" == "ios" ]]; then
-            dotnet publish osu.iOS/osu.iOS.csproj \
-              --configuration Release \
-              --verbosity normal \
-              --no-restore \
-              -p:Version=${{ needs.version.outputs.semver }} \
-              -p:ArchiveOnBuild=false
-
-            mkdir -p "publish/${{ matrix.runtime }}"
-
-            APP_DIR=$(find osu.iOS/bin/Release/ -name "*.app" -type d | head -1)
-            if [[ -n "$APP_DIR" ]]; then
-              echo "Found app bundle: $APP_DIR"
-              cp -R "$APP_DIR" "publish/${{ matrix.runtime }}/"
-            else
-              echo "WARNING: No .app bundle found, copying build output"
-              cp -R osu.iOS/bin/Release/net8.0-ios/* "publish/${{ matrix.runtime }}/" || true
-            fi
           else
             dotnet publish osu.Desktop/osu.Desktop.csproj \
               --self-contained \
@@ -403,12 +377,12 @@ jobs:
           fi
 
       - name: Set executable permissions (Linux/macOS)
-        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.runtime != 'android' && matrix.runtime != 'ios'
+        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.runtime != 'android'
         shell: bash
         run: chmod +x "publish/${{ matrix.runtime }}/${{ matrix.executable }}"
 
       - name: Create Velopack package
-        if: matrix.runtime != 'android' && matrix.runtime != 'ios'
+        if: matrix.runtime != 'android'
         shell: bash
         run: |
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
@@ -425,7 +399,7 @@ jobs:
 
             vpk pack \
               -u "osu-lazer-gu" \
-              -v "${{ needs.version.outputs.semver }}" \
+              -v "${{ needs.version.outputs.velopackVersion }}" \
               -p "publish/${{ matrix.runtime }}" \
               -e "${{ matrix.executable }}" \
               --packAuthors "osu! GooGuTeam" \
@@ -435,7 +409,7 @@ jobs:
           elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             vpk pack \
               -u "osu-lazer-gu" \
-              -v "${{ needs.version.outputs.semver }}" \
+              -v "${{ needs.version.outputs.velopackVersion }}" \
               -p "publish/${{ matrix.runtime }}" \
               -e "${{ matrix.executable }}" \
               --packAuthors "osu! GooGuTeam" \
@@ -445,7 +419,7 @@ jobs:
           else
             vpk pack \
               -u "osu-lazer-gu" \
-              -v "${{ needs.version.outputs.semver }}" \
+              -v "${{ needs.version.outputs.velopackVersion }}" \
               -p "publish/${{ matrix.runtime }}" \
               -e "${{ matrix.executable }}" \
               --packAuthors "osu! GooGuTeam" \
@@ -495,15 +469,6 @@ jobs:
             mkdir -p Releases
             if [ -f "publish/${{ matrix.runtime }}/${{ matrix.executable }}" ]; then
               cp "publish/${{ matrix.runtime }}/${{ matrix.executable }}" "Releases/osu-gu.apk"
-            fi
-          fi
-          # iOS artifact
-          if [[ "${{ matrix.runtime }}" == "ios" ]]; then
-            mkdir -p Releases
-            if [ -d "publish/${{ matrix.runtime }}" ]; then
-              cd "publish/${{ matrix.runtime }}"
-              zip -r "../../Releases/osu-gu-ios.zip" . || true
-              cd ../..
             fi
           fi
 
