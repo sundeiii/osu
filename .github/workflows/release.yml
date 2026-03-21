@@ -318,7 +318,8 @@ jobs:
           if [[ "${{ matrix.runtime }}" == "android" ]]; then
             KEYSTORE_PASS="${ANDROID_KEYSTORE_PASSWORD:-temp123}"
             KEY_ALIAS="${ANDROID_KEY_ALIAS:-osu}"
-            KEY_PASS="${ANDROID_KEY_PASSWORD:-temp123}"
+            # PKCS12 keystores require key password == store password
+            KEY_PASS="$KEYSTORE_PASS"
 
             echo "Using Java version: $(java -version 2>&1 | head -n 1)"
             echo "Android SDK Root: $ANDROID_SDK_ROOT"
