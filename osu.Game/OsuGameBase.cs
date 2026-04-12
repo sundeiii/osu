@@ -108,8 +108,7 @@ namespace osu.Game
 
         public virtual EndpointConfiguration CreateEndpoints()
         {
-            // EndpointConfiguration config = UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();
-            EndpointConfiguration config = new ProductionEndpointConfiguration();
+            EndpointConfiguration config = UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();
 
             string customUrl = LocalConfig?.Get<string>(OsuSetting.CustomApiUrl);
 
