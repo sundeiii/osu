@@ -19,6 +19,7 @@ using osu.Game.Online.API;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Rooms;
 using osu.Game.Online.Spectator;
+using osu.Game.Rulesets;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
@@ -47,6 +48,9 @@ namespace osu.Game.Screens.Play
         [Resolved(canBeNull: true)]
         [CanBeNull]
         private UserStatisticsWatcher userStatisticsWatcher { get; set; }
+
+	[Resolved]
+	protected RulesetHashCache RulesetHashCache { get; private set; } = null!;
 
         private readonly object scoreSubmissionLock = new object();
         private TaskCompletionSource<bool> scoreSubmissionSource;
