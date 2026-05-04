@@ -15,6 +15,7 @@ using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
+using osu.Framework.Development;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Statistics;
@@ -50,12 +51,15 @@ namespace osu.Game.Utils
             if (Environment.GetEnvironmentVariable("OSU_DISABLE_ERROR_REPORTING") == "1")
                 return;
 
+            if (DebugUtils.IsNUnitRunning)
+                return;
+
             if (!game.IsDeployedBuild || !game.CreateEndpoints().WebsiteUrl.EndsWith(@".ppy.sh", StringComparison.Ordinal))
                 return;
 
             sentrySession = SentrySdk.Init(options =>
             {
-                options.Dsn = "https://78cf763c094444e5bc31bb035442b90f@glitchtip.g0v0.top/3";
+                options.Dsn = "https://localhost";
                 options.AutoSessionTracking = true;
                 options.IsEnvironmentUser = false;
                 options.IsGlobalModeEnabled = true;
