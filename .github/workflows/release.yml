@@ -249,7 +249,6 @@ jobs:
           echo "Restoring packages for runtime: ${{ matrix.runtime }}"
           if [[ "${{ matrix.runtime }}" == "android" ]]; then
             dotnet restore osu.Android/osu.Android.csproj \
-              --runtime android-arm64 \
               --verbosity normal \
               --no-cache \
               --force
@@ -335,9 +334,9 @@ jobs:
             dotnet publish osu.Android/osu.Android.csproj \
               --configuration Release \
               --framework net8.0-android \
-              --runtime android-arm64 \
               --verbosity normal \
               --no-restore \
+              --self-contained \
               -p:Version=${{ needs.version.outputs.semver }} \
               -p:ApplicationVersion=${{ needs.version.outputs.androidVersionCode }} \
               -p:ApplicationDisplayVersion=${{ needs.version.outputs.semver }} \
