@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Net.WebSockets;
 using System.Threading.Tasks;
 using osu.Framework;
@@ -38,6 +39,8 @@ namespace osu.Game.Utils
     /// </summary>
     public class SentryLogger : IDisposable
     {
+        private const string sentry_dsn_assembly_metadata_key = "OsuSentryDsn";
+
         private IBindable<APIUser>? localUser;
 
         private readonly IDisposable? sentrySession;
@@ -57,9 +60,14 @@ namespace osu.Game.Utils
             if (!game.IsDeployedBuild || !game.CreateEndpoints().WebsiteUrl.EndsWith(@".ppy.sh", StringComparison.Ordinal))
                 return;
 
+            string? dsn = getConfiguredDsn();
+
+            if (string.IsNullOrWhiteSpace(dsn))
+                return;
+
             sentrySession = SentrySdk.Init(options =>
             {
-                options.Dsn = "https://localhost";
+                options.Dsn = dsn;
                 options.AutoSessionTracking = true;
                 options.IsEnvironmentUser = false;
                 options.IsGlobalModeEnabled = true;
@@ -70,6 +78,12 @@ namespace osu.Game.Utils
 
             Logger.NewEntry += processLogEntry;
         }
+
+        private static string? getConfiguredDsn() => typeof(SentryLogger).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key == sentry_dsn_assembly_metadata_key)?
+            .Value
+            ?.Trim();
 
         ~SentryLogger()
         {

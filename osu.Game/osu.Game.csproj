@@ -20,11 +20,20 @@ Modified by GooGuTeam</PackageReleaseNotes>
     <PackageIcon>icon.png</PackageIcon>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
+  <PropertyGroup Label="Build Configuration">
+    <SentryDsn Condition="'$(SentryDsn)' == ''"></SentryDsn>
+  </PropertyGroup>
   <ItemGroup Label="Icon">
     <None Include="..\assets\lazer-nuget.png">
       <Pack>True</Pack>
       <PackagePath>icon.png</PackagePath>
     </None>
+  </ItemGroup>
+  <ItemGroup Condition="'$(SentryDsn)' != ''">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>OsuSentryDsn</_Parameter1>
+      <_Parameter2>$(SentryDsn)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup Label="Package References">
     <!-- Held back due to licencing change stupidness. Silenced vulnerability does not affect us. -->
