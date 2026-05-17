@@ -44,6 +44,7 @@ using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.Localisation;
+using osu.Game.Medals;
 using osu.Game.Online;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.Chat;
@@ -1237,6 +1238,7 @@ namespace osu.Game
             loadComponentSingleFile(new AccountCreationOverlay(), topMostOverlayContent.Add, true);
             loadComponentSingleFile<IDialogOverlay>(new DialogOverlay(), topMostOverlayContent.Add, true);
             loadComponentSingleFile(new MedalOverlay(), topMostOverlayContent.Add);
+            loadComponentSingleFile(new MedalAwarderContainer(), Add, true);
 
             loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add);
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
