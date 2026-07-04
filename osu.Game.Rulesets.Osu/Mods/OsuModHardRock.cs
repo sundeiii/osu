@@ -13,6 +13,7 @@ namespace osu.Game.Rulesets.Osu.Mods
 {
     public class OsuModHardRock : ModHardRock, IApplicableToHitObject
     {
+
         public override Type[] IncompatibleMods => base.IncompatibleMods.Append(typeof(ModMirror)).ToArray();
 
         public void ApplyToHitObject(HitObject hitObject)
@@ -26,9 +27,9 @@ namespace osu.Game.Rulesets.Osu.Mods
         {
             base.ApplyToDifficulty(difficulty);
 
-            difficulty.OverallDifficulty = Math.Min(difficulty.OverallDifficulty * ADJUST_RATIO, 10.0f);
-            difficulty.CircleSize = Math.Min(difficulty.CircleSize * 1.3f, 10.0f); // CS uses a custom 1.3 ratio.
-            difficulty.ApproachRate = Math.Min(difficulty.ApproachRate * ADJUST_RATIO, 10.0f);
+            difficulty.OverallDifficulty = Math.Min(difficulty.OverallDifficulty * 1.01f, 10.0f);
+            difficulty.CircleSize = Math.Min(difficulty.CircleSize * 1.01f, 10.0f);
+            difficulty.ApproachRate = Math.Min(difficulty.ApproachRate * 1.01f, 10.0f);
         }
     }
 }

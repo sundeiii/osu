@@ -245,7 +245,7 @@ namespace osu.Game.Overlays.Profile.Header
             cover.User = user;
             avatar.User = user;
             usernameText.Text = user?.Username ?? string.Empty;
-            openUserExternally.Link = $@"{api.Endpoints.WebsiteUrl}/users/{user?.Id ?? 0}";
+            openUserExternally.Link = $@"https://rinarii.de/u/{user?.Id ?? 0}";
             userFlag.CountryCode = user?.CountryCode ?? default;
             userCountryText.Text = (user?.CountryCode ?? default).GetDescription();
             userCountryContainer.Action = () => rankingsOverlay?.ShowCountry(user?.CountryCode ?? default);

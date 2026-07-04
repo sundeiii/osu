@@ -4,6 +4,7 @@
 #nullable disable
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -18,10 +19,12 @@ using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Rooms;
+using osu.Game.Online.Solo;
 using osu.Game.Online.Spectator;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Ranking;
 
 namespace osu.Game.Screens.Play
@@ -323,8 +326,43 @@ namespace osu.Game.Screens.Play
                 score.ScoreInfo.OnlineID = s.ID;
                 score.ScoreInfo.Position = s.Position;
 
+                try
+                {
+                    using var replayStream = new MemoryStream();
+
+                    new LegacyScoreEncoder(
+                        score,
+                        GameplayState.Beatmap
+                    ).Encode(replayStream);
+
+                    byte[] replayBytes = replayStream.ToArray();
+
+                    Logger.Log(
+                        $"Replay encoded successfully " +
+                        $"(score:{s.ID} bytes:{replayBytes.Length})"
+                    );
+
+                    // Queue replay upload here.
+                    UploadReplay(
+                        s.ID,
+                        score.ScoreInfo.User.OnlineID,
+                        score.ScoreInfo.BeatmapInfo!.OnlineID,
+                        replayBytes
+                    );
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(
+                        e,
+                        $"Failed to encode replay for score {s.ID}"
+                    );
+                }
+
                 scoreSubmissionSource.SetResult(true);
-                Logger.Log($"Score submission completed! (token:{token.Value} id:{s.ID})");
+                Logger.Log(
+                    $"Score submission completed! " +
+                    $"(token:{token.Value} id:{s.ID})"
+                );
             };
 
             request.Failure += e =>
@@ -335,6 +373,38 @@ namespace osu.Game.Screens.Play
 
             api.Queue(request);
             return scoreSubmissionSource.Task;
+        }
+
+        private void UploadReplay(
+            long scoreId,
+            int userId,
+            int beatmapId,
+            byte[] replayBytes)
+        {
+            var request = new UploadReplayRequest(
+                scoreId,
+                userId,
+                beatmapId,
+                replayBytes
+            );
+
+            request.Success += _ =>
+            {
+                Logger.Log(
+                    $"Replay upload completed! " +
+                    $"(score:{scoreId} bytes:{replayBytes.Length})"
+                );
+            };
+
+            request.Failure += e =>
+            {
+                Logger.Error(
+                    e,
+                    $"Replay upload failed for score {scoreId}"
+                );
+            };
+
+            api.Queue(request);
         }
 
         private static string getUserFacingAPIError(Exception exception)

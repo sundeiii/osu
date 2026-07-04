@@ -58,6 +58,7 @@ namespace osu.Game.Users
                 statisticsProvider.StatisticsUpdated += onStatisticsUpdated;
 
             ruleset.BindValueChanged(_ => updateDisplay(), true);
+            updateDisplay();
         }
 
         private void onStatisticsUpdated(UserStatisticsUpdate update)
@@ -68,6 +69,17 @@ namespace osu.Game.Users
 
         private void updateDisplay()
         {
+            if (User.IsRestricted == true)
+            {
+                loadingLayer.State.Value = Visibility.Hidden;
+
+                globalRankDisplay.HighestRank.Value = User.RankHighest;
+                globalRankDisplay.UserStatistics.Value = null;
+
+                countryRankDisplay.Content.Text = "-";
+                return;
+            }
+
             var statistics = statisticsProvider?.GetStatisticsFor(ruleset.Value);
 
             loadingLayer.State.Value = statistics == null ? Visibility.Visible : Visibility.Hidden;

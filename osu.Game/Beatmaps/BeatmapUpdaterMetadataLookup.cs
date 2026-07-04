@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
@@ -54,12 +55,28 @@ namespace osu.Game.Beatmaps
                 // additionally note that the online ID stored to the map is EXPLICITLY NOT USED because some users in a silly attempt to "fix" things for themselves on stable
                 // would reuse online IDs of already submitted beatmaps, which means that information is pretty much expected to be bogus in a nonzero number of beatmapsets.
                 if (!tryLookup(beatmapInfo, preferOnlineFetch, out var res))
+                {
+                    Logger.Log(
+                        $"g0v0 metadata lookup failed for {beatmapInfo.Metadata.Artist} - {beatmapInfo.Metadata.Title}; resetting online info.",
+                        LoggingTarget.Runtime,
+                        LogLevel.Important
+                    );
+
+                    beatmapInfo.ResetOnlineInfo();
+                    lookupResults.Add(null);
                     continue;
+                }
 
                 if (res == null)
                 {
+                    Logger.Log(
+                        $"g0v0 metadata returned null for {beatmapInfo.Metadata.Artist} - {beatmapInfo.Metadata.Title}; resetting online info.",
+                        LoggingTarget.Runtime,
+                        LogLevel.Important
+                    );
+
                     beatmapInfo.ResetOnlineInfo();
-                    lookupResults.Add(null); // mark lookup failure
+                    lookupResults.Add(null);
                     continue;
                 }
 
@@ -82,8 +99,15 @@ namespace osu.Game.Beatmaps
                 }
             }
 
+            if (lookupResults.Any(r => r == null))
+            {
+                beatmapSet.Status = BeatmapOnlineStatus.None;
+                beatmapSet.DateRanked = null;
+                beatmapSet.DateSubmitted = null;
+                return;
+            }
+
             if (beatmapSet.Beatmaps.All(b => b.MatchesOnlineVersion)
-                && lookupResults.All(r => r != null)
                 && lookupResults.Select(r => r!.BeatmapSetID).Distinct().Count() == 1)
             {
                 var representative = lookupResults.First()!;
@@ -115,11 +139,18 @@ namespace osu.Game.Beatmaps
         /// </remarks>
         private bool tryLookup(BeatmapInfo beatmapInfo, bool preferOnlineFetch, out OnlineBeatmapMetadata? result)
         {
-            bool useLocalCache = !apiMetadataSource.Available || !preferOnlineFetch;
-            if (useLocalCache && localCachedMetadataSource.TryLookup(beatmapInfo, out result))
-                return true;
+            // If the server API is available, it is authoritative.
+            // Do not fall back to stale local osu! metadata when the server does not know the map.
+            if (apiMetadataSource.Available)
+            {
+                if (apiMetadataSource.TryLookup(beatmapInfo, out result))
+                    return true;
 
-            if (apiMetadataSource.TryLookup(beatmapInfo, out result))
+                result = null;
+                return true;
+            }
+
+            if (localCachedMetadataSource.TryLookup(beatmapInfo, out result))
                 return true;
 
             result = null;

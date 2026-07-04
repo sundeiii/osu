@@ -113,6 +113,18 @@ namespace osu.Game.Online.API.Requests.Responses
         [JsonProperty(@"is_active")]
         public bool Active;
 
+        [JsonProperty(@"is_restricted")]
+        public bool? IsRestricted { get; set; }
+
+        [JsonProperty(@"restriction_reason")]
+        public string RestrictionReason { get; set; }
+
+        [JsonProperty(@"restriction_until")]
+        public DateTimeOffset? RestrictionUntil { get; set; }
+
+        [JsonProperty(@"restriction_permanent")]
+        public bool RestrictionPermanent { get; set; }
+
         /// <summary>
         /// From osu-web's perspective, whether a user was recently online.
         /// This doesn't imply the user is online in a lazer client (may be updated from stable or web browser).
@@ -236,7 +248,7 @@ namespace osu.Game.Online.API.Requests.Responses
         [JsonProperty(@"statistics")]
         public UserStatistics Statistics
         {
-            get => statistics ??= new UserStatistics();
+            get => statistics;
             set
             {
                 if (statistics != null)
@@ -264,7 +276,14 @@ namespace osu.Game.Online.API.Requests.Responses
         [JsonProperty(@"rank_history")]
         private APIRankHistory rankHistory
         {
-            set => Statistics.RankHistory = value;
+            set
+            {
+                if (value == null)
+                    return;
+
+                statistics ??= new UserStatistics();
+                statistics.RankHistory = value;
+            }
         }
 
         [JsonProperty(@"active_tournament_banners")]

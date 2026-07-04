@@ -60,6 +60,8 @@ namespace osu.Game.Screens.Select
 {
     public abstract partial class SongSelect : ScreenWithBeatmapBackground, IKeyBindingHandler<GlobalAction>, ISongSelect, IHandlePresentBeatmap, IProvideCursor
     {
+        public static readonly HashSet<int> MissingServerBeatmapSets = new HashSet<int>();
+
         /// <summary>
         /// A debounce that governs how long after a panel is selected before the rest of song select (and the game at large)
         /// updates to show that selection.

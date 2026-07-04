@@ -132,7 +132,12 @@ namespace osu.Game.Online.Chat
                 case @"http":
                 case @"https":
                     // length > 3 since all these links need another argument to work
-                    if (args.Length > 3 && args[1].EndsWith(WebsiteRootUrl, StringComparison.OrdinalIgnoreCase))
+                    if (args.Length > 3 &&
+                        (
+                            args[1].EndsWith(WebsiteRootUrl, StringComparison.OrdinalIgnoreCase)
+                            || args[1].Equals("osu.rinarii.de", StringComparison.OrdinalIgnoreCase)
+                            || args[1].Equals("rinarii.de", StringComparison.OrdinalIgnoreCase)
+                        ))
                     {
                         string mainArg = args[3];
 

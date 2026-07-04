@@ -245,6 +245,11 @@ namespace osu.Game.Online.API
             IBindableList<APIRelation> ILocalUserState.Blocks => Blocks;
             IBindableList<int> ILocalUserState.FavouriteBeatmapSets => FavouriteBeatmapSets;
 
+            public void SetLocalUser(APIMe me)
+            {
+                User.Value = me;
+            }
+
             public void UpdateFriends()
             {
             }

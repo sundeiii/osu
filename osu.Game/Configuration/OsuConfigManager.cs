@@ -165,6 +165,45 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.IncreaseFirstObjectVisibility, true);
             SetDefault(OsuSetting.GameplayDisableWinKey, true);
 
+            SetDefault(OsuSetting.AnarchyRelax, false);
+            SetDefault(OsuSetting.AnarchyRemoveHidden, false);
+            SetDefault(OsuSetting.AnarchyTimewarpEnabled, false);
+
+            SetDefault(
+                OsuSetting.AnarchyTimewarpRate,
+                1.0,
+                0.5,
+                3.0,
+                0.05);
+
+            SetDefault(OsuSetting.AnarchyApproachRateEnabled, false);
+
+            
+            SetDefault(
+                OsuSetting.AnarchyApproachRate,
+                -1.0,
+                -1.0,
+                11.0,
+                0.1);
+
+            // Initialise the runtime state from saved config values,
+            // and keep it synchronised if config changes.
+            GetBindable<bool>(OsuSetting.AnarchyRelax).BindValueChanged(
+                change => AnarchySettingsState.Relax = change.NewValue,
+                true);
+
+            GetBindable<bool>(OsuSetting.AnarchyRemoveHidden).BindValueChanged(
+                change => AnarchySettingsState.RemoveHidden = change.NewValue,
+                true);
+
+            GetBindable<double>(OsuSetting.AnarchyTimewarpRate).BindValueChanged(
+                change => AnarchySettingsState.TimewarpRate.Value = change.NewValue,
+                true);
+
+            GetBindable<double>(OsuSetting.AnarchyApproachRate).BindValueChanged(
+                change => AnarchySettingsState.ApproachRate = change.NewValue,
+                true);    
+                
             // Update
             SetDefault(OsuSetting.ReleaseStream, ReleaseStream.Lazer);
 
@@ -403,6 +442,12 @@ namespace osu.Game.Configuration
         ScoreDisplayMode,
         ExternalLinkWarning,
         PreferNoVideo,
+        AnarchyRelax,
+        AnarchyRemoveHidden,
+        AnarchyTimewarpEnabled,
+        AnarchyTimewarpRate,
+        AnarchyApproachRateEnabled,
+        AnarchyApproachRate,
         Scaling,
         ScalingPositionX,
         ScalingPositionY,

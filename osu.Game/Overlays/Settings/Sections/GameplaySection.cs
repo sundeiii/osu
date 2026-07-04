@@ -30,6 +30,7 @@ namespace osu.Game.Overlays.Settings.Sections
                 new HUDSettings(),
                 new InputSettings(),
                 new ModsSettings(),
+                new AnarchySettings(),
             };
         }
     }

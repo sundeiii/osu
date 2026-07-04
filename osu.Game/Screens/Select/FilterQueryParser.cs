@@ -100,6 +100,7 @@ namespace osu.Game.Screens.Select
                     return TryUpdateCriteriaRange(ref criteria.BeatDivisor, op, value, tryParseInt);
 
                 case "status":
+                    value = normaliseStatusAlias(value);
                     return TryUpdateCriteriaSet(ref criteria.OnlineStatus, op, value);
 
                 case "creator":
@@ -387,6 +388,38 @@ namespace osu.Game.Screens.Select
             where T : struct
             => parseFunction.Invoke(val, out var converted) && tryUpdateCriteriaRange(ref range, op, converted);
 
+        private static string normaliseStatusAlias(string value)
+        {
+            return value.ToLowerInvariant() switch
+            {
+                "r" => "ranked",
+                "rank" => "ranked",
+
+                "a" => "approved",
+                "app" => "approved",
+
+                "q" => "qualified",
+                "qual" => "qualified",
+
+                "l" => "loved",
+                "love" => "loved",
+
+                "p" => "pending",
+                "pend" => "pending",
+
+                "g" => "graveyard",
+                "grave" => "graveyard",
+
+                "w" => "wip",
+
+                "u" => "none",
+                "unknown" => "none",
+                "missing" => "none",
+                "notfound" => "none",
+
+                _ => value,
+            };
+        }
         /// <summary>
         /// Attempts to parse a keyword filter of type <typeparamref name="T"/>,
         /// from the specified <paramref name="op"/> and <paramref name="filterValue"/>.
@@ -396,6 +429,7 @@ namespace osu.Game.Screens.Select
         /// <param name="range">The <see cref="FilterCriteria.OptionalSet{T}"/> to store the parsed data into, if successful.</param>
         /// <param name="op">The operator for the keyword filter.</param>
         /// <param name="filterValue">The value of the keyword filter.</param>
+
         public static bool TryUpdateCriteriaSet<T>(ref FilterCriteria.OptionalSet<T> range, Operator op, string filterValue)
             where T : struct, Enum
         {

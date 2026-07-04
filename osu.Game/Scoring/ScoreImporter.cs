@@ -19,6 +19,8 @@ using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Utils;
 using Realms;
+using System.Threading.Tasks;
+using osu.Game.Overlays.Notifications;
 
 namespace osu.Game.Scoring
 {
@@ -71,6 +73,32 @@ namespace osu.Game.Scoring
                     return null;
                 }
             }
+        }
+
+        public override async Task<Live<ScoreInfo>?> ImportAsUpdate(
+            ProgressNotification notification,
+            ImportTask importTask,
+            ScoreInfo original)
+        {
+            long originalOnlineId = original.OnlineID;
+            long originalLegacyOnlineId = original.LegacyOnlineID;
+
+            var imported = await Import(notification, new[] { importTask }).ConfigureAwait(false);
+
+            if (!imported.Any())
+                return null;
+
+            Debug.Assert(imported.Count() == 1);
+
+            var first = imported.First();
+
+            first.PerformWrite(score =>
+            {
+                score.OnlineID = originalOnlineId;
+                score.LegacyOnlineID = originalLegacyOnlineId;
+            });
+
+            return first;
         }
 
         public Score GetScore(ScoreInfo score) => new LegacyDatabasedScore(score, rulesets, beatmaps(), Files.Store);

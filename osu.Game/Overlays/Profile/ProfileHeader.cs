@@ -10,6 +10,11 @@ using osu.Game.Graphics;
 using osu.Game.Overlays.Profile.Header;
 using osu.Game.Overlays.Profile.Header.Components;
 using osu.Game.Resources.Localisation.Web;
+using osu.Framework.Graphics.Shapes;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Online.API.Requests.Responses;
+using osuTK.Graphics;
+using osuTK;
 
 namespace osu.Game.Overlays.Profile
 {
@@ -59,6 +64,11 @@ namespace osu.Game.Overlays.Profile
                     RelativeSizeAxes = Axes.X,
                     User = { BindTarget = User },
                 },
+                new RestrictedHeaderContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    User = { BindTarget = User },
+                },
                 detailHeaderContainer = new DetailHeaderContainer
                 {
                     RelativeSizeAxes = Axes.X,
@@ -92,6 +102,103 @@ namespace osu.Game.Overlays.Profile
         {
             User = { BindTarget = User }
         };
+
+        private partial class RestrictedHeaderContainer : CompositeDrawable
+        {
+            public readonly Bindable<UserProfileData?> User = new Bindable<UserProfileData?>();
+
+            private readonly OsuSpriteText title;
+            private readonly OsuSpriteText description;
+
+            public RestrictedHeaderContainer()
+            {
+                RelativeSizeAxes = Axes.X;
+                Height = 0;
+                Alpha = 0;
+                AlwaysPresent = true;
+                Padding = new MarginPadding
+                {
+                    Horizontal = WaveOverlayContainer.HORIZONTAL_PADDING,
+                    Top = 10,
+                    Bottom = 8,
+                };
+
+                InternalChild = new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Masking = true,
+                    CornerRadius = 6,
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = new Color4(42, 22, 30, 235),
+                        },
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Y,
+                            Width = 5,
+                            Colour = new Color4(235, 72, 112, 255),
+                        },
+                        new FillFlowContainer
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Direction = FillDirection.Vertical,
+                            Spacing = new Vector2(0, 4),
+                            Padding = new MarginPadding
+                            {
+                                Left = 18,
+                                Right = 18,
+                                Top = 10,
+                                Bottom = 10,
+                            },
+                            Children = new Drawable[]
+                            {
+                                title = new OsuSpriteText
+                                {
+                                    Text = "This account is restricted",
+                                    Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
+                                    Colour = Color4.White,
+                                },
+                                description = new OsuSpriteText
+                                {
+                                    Text = "",
+                                    Font = OsuFont.GetFont(size: 14),
+                                    Colour = new Color4(255, 215, 225, 255),
+                                },
+                            },
+                        },
+                    },
+                };
+
+                User.BindValueChanged(user => updateDisplay(user.NewValue?.User), true);
+            }
+
+            private void updateDisplay(APIUser? user)
+            {
+                if (user?.IsRestricted != true)
+                {
+                    this.ResizeHeightTo(0, 180, Easing.OutQuint);
+                    this.FadeOut(120, Easing.OutQuint);
+                    return;
+                }
+
+                string reason = string.IsNullOrWhiteSpace(user.RestrictionReason)
+                    ? "No reason provided"
+                    : user.RestrictionReason;
+
+                string until = user.RestrictionPermanent || user.RestrictionUntil == null
+                    ? "Permanent"
+                    : user.RestrictionUntil.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+                description.Text = $"Scores from this account do not affect rankings, pp, leaderboards, or medals. Reason: {reason}. Restriction ends: {until}.";
+
+                this.ResizeHeightTo(76, 220, Easing.OutQuint);
+                this.FadeIn(220, Easing.OutQuint);
+            }
+        }
 
         private partial class ProfileHeaderTitle : OverlayTitle
         {

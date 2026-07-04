@@ -22,6 +22,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
+using osu.Game.Configuration;
 
 namespace osu.Game.Beatmaps
 {
@@ -313,6 +314,14 @@ namespace osu.Game.Beatmaps
                     mod.ApplyToDifficulty(converted.Difficulty);
                 }
             }
+            
+            // Anarchy AR override.
+            if (AnarchySettingsState.ApproachRateEnabled)
+            {
+                converted.Difficulty.ApproachRate =
+                    (float)AnarchySettingsState.ApproachRate;
+            }
+                    
 
             var processor = rulesetInstance.CreateBeatmapProcessor(converted);
 

@@ -27,6 +27,10 @@ namespace osu.Game.Overlays.Profile.Header.Components
         private GlobalRankDisplay detailGlobalRank = null!;
         private ProfileValueDisplay detailCountryRank = null!;
         private RankGraph rankGraph = null!;
+        private Container rankedStatsContainer = null!;
+        private Container rankGraphContainer = null!;
+        private FillFlowContainer scoreRanksFlow = null!;
+        private TotalPlayTime totalPlayTime = null!;
 
         public readonly Bindable<UserProfileData?> User = new Bindable<UserProfileData?>();
 
@@ -92,7 +96,7 @@ namespace osu.Game.Overlays.Profile.Header.Components
                             }
                         }
                     },
-                    new Container
+                    rankGraphContainer = new Container
                     {
                         RelativeSizeAxes = Axes.X,
                         Height = 60,
@@ -104,7 +108,7 @@ namespace osu.Game.Overlays.Profile.Header.Components
                             },
                         }
                     },
-                    new Container
+                    rankedStatsContainer = new Container
                     {
                         RelativeSizeAxes = Axes.X,
                         AutoSizeAxes = Axes.Y,
@@ -127,13 +131,13 @@ namespace osu.Game.Overlays.Profile.Header.Components
                                     {
                                         Title = "pp",
                                     },
-                                    new TotalPlayTime
+                                    totalPlayTime = new TotalPlayTime
                                     {
                                         User = { BindTarget = User }
                                     },
                                 }
                             },
-                            new FillFlowContainer
+                            scoreRanksFlow = new FillFlowContainer
                             {
                                 AutoSizeAxes = Axes.Both,
                                 Anchor = Anchor.CentreRight,
@@ -165,21 +169,30 @@ namespace osu.Game.Overlays.Profile.Header.Components
         private void updateDisplay(UserProfileData? data)
         {
             var user = data?.User;
+            bool restricted = user?.IsRestricted == true;
+            bool hasStatistics = user?.Statistics != null;
 
-            medalInfo.Content.Text = user?.Achievements?.Length.ToString() ?? "0";
-            ppInfo.Content.Text = user?.Statistics?.PP?.ToLocalisableString("#,##0") ?? (LocalisableString)"0";
-            ppInfo.Content.TooltipText = getPPInfoTooltipText(user);
+            medalInfo.Content.Text = restricted ? "-" : user?.Achievements?.Length.ToString() ?? "0";
+            ppInfo.Content.Text = !restricted && hasStatistics
+                ? user!.Statistics.PP?.ToLocalisableString("#,##0") ?? (LocalisableString)"0"
+                : (LocalisableString)"-";
+            ppInfo.Content.TooltipText = !restricted ? getPPInfoTooltipText(user) : default;
 
             foreach (var scoreRankInfo in scoreRankInfos)
-                scoreRankInfo.Value.RankCount = user?.Statistics?.GradesCount[scoreRankInfo.Key] ?? 0;
+                scoreRankInfo.Value.RankCount = !restricted && hasStatistics ? user!.Statistics.GradesCount[scoreRankInfo.Key] : 0;
 
             detailGlobalRank.HighestRank.Value = user?.RankHighest;
-            detailGlobalRank.UserStatistics.Value = user?.Statistics;
+            detailGlobalRank.UserStatistics.Value = !restricted ? user?.Statistics : null;
 
-            detailCountryRank.Content.Text = user?.Statistics?.CountryRank?.ToLocalisableString("\\##,##0") ?? (LocalisableString)"-";
-            detailCountryRank.Content.TooltipText = getCountryRankTooltipText(user);
+            detailCountryRank.Content.Text = !restricted && hasStatistics
+                ? user!.Statistics.CountryRank?.ToLocalisableString("\\##,##0") ?? (LocalisableString)"-"
+                : (LocalisableString)"-";
+            detailCountryRank.Content.TooltipText = !restricted ? getCountryRankTooltipText(user) : default;
 
-            rankGraph.Statistics.Value = user?.Statistics;
+            rankGraph.Statistics.Value = !restricted ? user?.Statistics : null;
+
+            rankGraphContainer.Alpha = restricted ? 0 : 1;
+            rankedStatsContainer.Alpha = restricted ? 0 : 1;
         }
 
         private static LocalisableString getCountryRankTooltipText(APIUser? user)

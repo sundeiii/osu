@@ -113,7 +113,14 @@ namespace osu.Game.Audio
                     Logger.Log($"A {nameof(PreviewTrack)} was created without a containing {nameof(IPreviewTrackOwner)}. An owner should be added for correct behaviour.");
             }
 
-            protected override Track GetTrack() => trackManager.Get($"https://b.ppy.sh/preview/{beatmapSetInfo.OnlineID}.mp3");
+            protected override Track GetTrack()
+            {
+                string previewUrl = beatmapSetInfo.OnlineID >= 1_000_000_000
+                    ? $"https://rinarii.de/preview/{beatmapSetInfo.OnlineID}.mp3"
+                    : $"https://b.ppy.sh/preview/{beatmapSetInfo.OnlineID}.mp3";
+
+                return trackManager.Get(previewUrl);
+            }
         }
     }
 }

@@ -17,7 +17,7 @@ namespace osu.Game.Overlays.Profile.Header
         public readonly Bindable<UserProfileData?> User = new Bindable<UserProfileData?>();
 
         private LevelBadge levelBadge = null!;
-
+        private Container levelContainer = null!;
         public CentreHeaderContainer()
         {
             Height = 60;
@@ -61,7 +61,7 @@ namespace osu.Game.Overlays.Profile.Header
                         }
                     }
                 },
-                new Container
+                levelContainer = new Container
                 {
                     Anchor = Anchor.CentreRight,
                     Origin = Anchor.CentreRight,
@@ -102,7 +102,10 @@ namespace osu.Game.Overlays.Profile.Header
 
         private void updateDisplay(APIUser? user)
         {
-            levelBadge.LevelInfo.Value = user?.Statistics?.Level;
+            bool restricted = user?.IsRestricted == true;
+
+            levelBadge.LevelInfo.Value = restricted ? null : user?.Statistics?.Level;
+            levelContainer.Alpha = restricted ? 0 : 1;
         }
     }
 }

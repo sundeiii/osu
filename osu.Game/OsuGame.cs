@@ -49,11 +49,13 @@ using osu.Game.Localisation;
 using osu.Game.Medals;
 using osu.Game.Online;
 using osu.Game.Online.API.Requests;
+using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Chat;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Online.Rooms;
 using osu.Game.Overlays;
 using osu.Game.Overlays.BeatmapListing;
+using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Music;
 using osu.Game.Overlays.Notifications;
@@ -164,6 +166,16 @@ namespace osu.Game
         private OnScreenDisplay onScreenDisplay;
 
         private DialogOverlay dialogOverlay;
+
+        private bool localUserRestrictionStateInitialised;
+        private bool restrictedLoginPopupShown;
+        private bool unrestrictedLoginPopupShown;
+
+        private int? lastRefreshRestrictionUserId;
+        private bool? lastRefreshRestrictionState;
+
+        private ScheduledDelegate localUserRestrictionRefreshSchedule;
+        private const double local_user_restriction_refresh_interval = 60000;
 
         [Resolved]
         private FrameworkConfigManager frameworkConfig { get; set; }
@@ -1242,6 +1254,68 @@ namespace osu.Game
 
             loadComponentSingleFile(new AccountCreationOverlay(), topMostOverlayContent.Add, true);
             loadComponentSingleFile<IDialogOverlay>(dialogOverlay = new DialogOverlay(), topMostOverlayContent.Add, true);
+
+            API.LocalUser.BindValueChanged(user =>
+            {
+                APIUser oldUser = user.OldValue;
+                APIUser newUser = user.NewValue;
+
+                bool oldIsRealUser = oldUser != null && oldUser.Id != APIUser.SYSTEM_USER_ID;
+                bool newIsRealUser = newUser != null && newUser.Id != APIUser.SYSTEM_USER_ID;
+
+                if (!newIsRealUser)
+                {
+                    localUserRestrictionStateInitialised = false;
+                    restrictedLoginPopupShown = false;
+                    unrestrictedLoginPopupShown = false;
+                    lastRefreshRestrictionUserId = null;
+                    lastRefreshRestrictionState = null;
+                    return;
+                }
+
+                if (oldIsRealUser && oldUser.Id != newUser.Id)
+                {
+                    localUserRestrictionStateInitialised = false;
+                    restrictedLoginPopupShown = false;
+                    unrestrictedLoginPopupShown = false;
+                    lastRefreshRestrictionUserId = newUser.Id;
+                    lastRefreshRestrictionState = newUser.IsRestricted == true;
+                }
+
+                bool newRestricted = newUser.IsRestricted == true;
+
+                if (lastRefreshRestrictionUserId != newUser.Id)
+                {
+                    lastRefreshRestrictionUserId = newUser.Id;
+                    lastRefreshRestrictionState = newRestricted;
+                }
+
+                if (!localUserRestrictionStateInitialised)
+                {
+                    localUserRestrictionStateInitialised = true;
+
+                    if (newRestricted && !restrictedLoginPopupShown)
+                    {
+                        restrictedLoginPopupShown = true;
+                        unrestrictedLoginPopupShown = false;
+
+                        waitForReady(() => dialogOverlay, overlay => overlay.Push(new RestrictedAccountDialog(newUser)));
+                    }
+
+                    return;
+                }
+
+                if (newRestricted && !restrictedLoginPopupShown)
+                {
+                    restrictedLoginPopupShown = true;
+                    unrestrictedLoginPopupShown = false;
+
+                    waitForReady(() => dialogOverlay, overlay => overlay.Push(new RestrictedAccountDialog(newUser)));
+                }
+            }, true);
+
+            scheduleLocalUserRestrictionRefresh();
+
             loadComponentSingleFile(new MedalOverlay(), topMostOverlayContent.Add);
             loadComponentSingleFile(new MedalAwarderContainer(), Add, true);
 
@@ -1409,6 +1483,92 @@ namespace osu.Game
             }
         }
 
+        private void scheduleLocalUserRestrictionRefresh()
+        {
+            localUserRestrictionRefreshSchedule?.Cancel();
+            localUserRestrictionRefreshSchedule = Scheduler.AddDelayed(refreshLocalUserRestrictionState, local_user_restriction_refresh_interval);
+        }
+
+        private void refreshLocalUserRestrictionState()
+        {
+            try
+            {
+                if (!API.IsLoggedIn || API.LocalUser.Value == null || API.LocalUser.Value.Id == APIUser.SYSTEM_USER_ID)
+                {
+                    lastRefreshRestrictionUserId = null;
+                    lastRefreshRestrictionState = null;
+
+                    scheduleLocalUserRestrictionRefresh();
+                    return;
+                }
+
+                int currentUserId = API.LocalUser.Value.Id;
+
+                Logger.Log(
+                    $"[restriction-refresh] queued /me for user={currentUserId}, currentLocalRestricted={API.LocalUser.Value.IsRestricted}, lastUser={lastRefreshRestrictionUserId}, lastState={lastRefreshRestrictionState}",
+                    LoggingTarget.Network
+                );
+
+                var request = new GetMeRequest();
+
+                request.Success += me =>
+                {
+                    Schedule(() =>
+                    {
+                        if (me == null)
+                            return;
+
+                        if (API.LocalUser.Value == null || API.LocalUser.Value.Id != currentUserId)
+                            return;
+
+                        if (me.Id != currentUserId)
+                            return;
+
+                        bool meHasRestrictionState = me.IsRestricted != null;
+
+                        API.LocalUserState.SetLocalUser(me);
+
+                        if (!meHasRestrictionState)
+                            return;
+
+                        bool isRestricted = me.IsRestricted == true;
+
+                        if (lastRefreshRestrictionUserId != me.Id)
+                        {
+                            lastRefreshRestrictionUserId = me.Id;
+                            lastRefreshRestrictionState = isRestricted;
+                            return;
+                        }
+
+                        bool? previousRestricted = lastRefreshRestrictionState;
+                        lastRefreshRestrictionState = isRestricted;
+
+                        if (previousRestricted == false && isRestricted)
+                        {
+                            restrictedLoginPopupShown = true;
+                            unrestrictedLoginPopupShown = false;
+
+                            waitForReady(() => dialogOverlay, overlay => overlay.Push(new RestrictedAccountDialog(me)));
+                        }
+
+                        if (previousRestricted == true && !isRestricted)
+                        {
+                            unrestrictedLoginPopupShown = true;
+                            restrictedLoginPopupShown = false;
+
+                            waitForReady(() => dialogOverlay, overlay => overlay.Push(new UnrestrictedAccountDialog(me)));
+                        }
+                    });
+                };
+
+                API.Queue(request);
+            }
+            finally
+            {
+                scheduleLocalUserRestrictionRefresh();
+            }
+        }
+
         private void showServerInfoNotification()
         {
             Scheduler.AddDelayed(() =>
@@ -1438,6 +1598,8 @@ namespace osu.Game
 
         private void forwardGeneralLogToNotifications(LogEntry entry)
         {
+            if (entry.Message == "Method does not exist.")
+                return;
             if (entry.Level < LogLevel.Important || entry.Target > LoggingTarget.Database || entry.Target == null) return;
 
             if (entry.Exception is SentryOnlyDiagnosticsException)
@@ -1824,6 +1986,78 @@ namespace osu.Game
 
             if (newScreen == null)
                 Exit();
+        }
+        private partial class RestrictedAccountDialog : PopupDialog
+        {
+            private readonly APIUser user;
+
+            public RestrictedAccountDialog(APIUser user)
+            {
+                this.user = user;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                Logger.Log("[restriction-refresh] showing restricted popup", LoggingTarget.Network);
+                string reason = string.IsNullOrWhiteSpace(user.RestrictionReason)
+                    ? "No reason provided"
+                    : user.RestrictionReason;
+
+                string until = user.RestrictionPermanent || user.RestrictionUntil == null
+                    ? "Permanent"
+                    : user.RestrictionUntil.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+                HeaderText = "Your account is restricted";
+
+                BodyText =
+                    "You can still log in and play.\n\n" +
+                    "While restricted, your scores will not affect rankings, pp, leaderboards, or medals.\n\n" +
+                    $"Reason: {reason}\n" +
+                    $"Restriction ends: {until}";
+
+                Icon = FontAwesome.Solid.ExclamationTriangle;
+
+                Buttons = new PopupDialogButton[]
+                {
+                    new PopupDialogDangerousButton
+                    {
+                        Text = "I understand",
+                    },
+                };
+            }
+        }
+
+        private partial class UnrestrictedAccountDialog : PopupDialog
+        {
+            private readonly APIUser user;
+
+            public UnrestrictedAccountDialog(APIUser user)
+            {
+                this.user = user;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                Logger.Log("[restriction-refresh] showing unrestricted popup", LoggingTarget.Network);
+
+                HeaderText = "Your account has been unrestricted";
+
+                BodyText =
+                    "Your account is no longer restricted.\n\n" +
+                    "Your new scores can now affect rankings, pp, leaderboards, and medals again.";
+
+                Icon = FontAwesome.Solid.CheckCircle;
+
+                Buttons = new PopupDialogButton[]
+                {
+                    new PopupDialogOkButton
+                    {
+                        Text = "Nice",
+                    },
+                };
+            }
         }
     }
 }

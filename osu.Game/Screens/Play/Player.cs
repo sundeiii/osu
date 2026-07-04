@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
@@ -1151,8 +1152,32 @@ namespace osu.Game.Screens.Play
             foreach (var mod in GameplayState.Mods.OfType<IApplicableToHUD>())
                 mod.ApplyToHUD(HUDOverlay);
 
+            // Clear anything previously attached to gameplay mod adjustments.
+            GameplayClockContainer.AdjustmentsFromMods.RemoveAllAdjustments(
+                AdjustableProperty.Frequency);
+
+            GameplayClockContainer.AdjustmentsFromMods.RemoveAllAdjustments(
+                AdjustableProperty.Tempo);
+
+            musicController.SetAnarchyTimewarpSuppressed(true);
+
             foreach (var mod in GameplayState.Mods.OfType<IApplicableToTrack>())
+            {
+                if (AnarchySettingsState.TimewarpEnabled
+                    && (mod is ModDoubleTime || mod is ModHalfTime))
+                {
+                    continue;
+                }
+
                 mod.ApplyToTrack(GameplayClockContainer.AdjustmentsFromMods);
+            }
+
+            if (AnarchySettingsState.TimewarpEnabled)
+            {
+                GameplayClockContainer.AdjustmentsFromMods.AddAdjustment(
+                    AdjustableProperty.Frequency,
+                    AnarchySettingsState.TimewarpRate);
+            }
 
             updateGameplayState();
 
@@ -1216,6 +1241,8 @@ namespace osu.Game.Screens.Play
             (GameplayClockContainer as MasterGameplayClockContainer)?.StopUsingBeatmapClock();
 
             musicController.ResetTrackAdjustments();
+
+            musicController.SetAnarchyTimewarpSuppressed(false);
 
             fadeOut();
 

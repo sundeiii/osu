@@ -51,7 +51,8 @@ namespace osu.Game.Overlays
         public readonly BindableBool AllowTrackControl = new BindableBool(true);
 
         public readonly BindableBool Shuffle = new BindableBool(true);
-
+        private IBindable<bool> anarchyTimewarpEnabled = null!;
+        private IBindable<double> anarchyTimewarpRate = null!;
         /// <summary>
         /// Fired when the global <see cref="WorkingBeatmap"/> has changed.
         /// Includes direction information for display purposes.
@@ -84,10 +85,36 @@ namespace osu.Game.Overlays
         private void load(AudioManager audio, OsuConfigManager configManager)
         {
             AddInternal(audioDuckFilter = new AudioFilter(audio.TrackMixer));
-            audio.Tracks.AddAdjustment(AdjustableProperty.Volume, audioDuckVolume);
+
+            audio.Tracks.AddAdjustment(
+                AdjustableProperty.Volume,
+                audioDuckVolume);
+
             sampleVolume = audio.VolumeSample.GetBoundCopy();
 
-            configManager.BindWith(OsuSetting.RandomSelectAlgorithm, randomSelectAlgorithm);
+            configManager.BindWith(
+                OsuSetting.RandomSelectAlgorithm,
+                randomSelectAlgorithm);
+
+            anarchyTimewarpEnabled =
+                configManager.GetBindable<bool>(
+                    OsuSetting.AnarchyTimewarpEnabled);
+
+            anarchyTimewarpRate =
+                configManager.GetBindable<double>(
+                    OsuSetting.AnarchyTimewarpRate);
+
+            anarchyTimewarpEnabled.BindValueChanged(change =>
+            {
+                AnarchySettingsState.TimewarpEnabled = change.NewValue;
+                ResetTrackAdjustments();
+            }, true);
+
+            anarchyTimewarpRate.BindValueChanged(change =>
+            {
+                AnarchySettingsState.TimewarpRate.Value = change.NewValue;
+                ResetTrackAdjustments();
+            }, true);
         }
 
         protected override void LoadComplete()
@@ -548,6 +575,7 @@ namespace osu.Game.Overlays
         }
 
         private bool applyModTrackAdjustments;
+        private bool suppressAnarchyTimewarp;
 
         /// <summary>
         /// Whether mod track adjustments are allowed to be applied.
@@ -565,6 +593,15 @@ namespace osu.Game.Overlays
             }
         }
 
+        public void SetAnarchyTimewarpSuppressed(bool suppressed)
+        {
+            if (suppressAnarchyTimewarp == suppressed)
+                return;
+
+            suppressAnarchyTimewarp = suppressed;
+            ResetTrackAdjustments();
+        }
+
         private AudioAdjustments? modTrackAdjustments;
 
         /// <summary>
@@ -575,7 +612,6 @@ namespace osu.Game.Overlays
         /// </remarks>
         public void ResetTrackAdjustments()
         {
-            // todo: we probably want a helper method rather than this.
             CurrentTrack.RemoveAllAdjustments(AdjustableProperty.Balance);
             CurrentTrack.RemoveAllAdjustments(AdjustableProperty.Frequency);
             CurrentTrack.RemoveAllAdjustments(AdjustableProperty.Tempo);
@@ -583,10 +619,27 @@ namespace osu.Game.Overlays
 
             if (applyModTrackAdjustments)
             {
-                CurrentTrack.BindAdjustments(modTrackAdjustments = new AudioAdjustments());
+                CurrentTrack.BindAdjustments(
+                    modTrackAdjustments = new AudioAdjustments());
 
                 foreach (var mod in mods.Value.OfType<IApplicableToTrack>())
+                {
+                    if (AnarchySettingsState.TimewarpEnabled
+                        && (mod is ModDoubleTime || mod is ModHalfTime))
+                    {
+                        continue;
+                    }
+
                     mod.ApplyToTrack(modTrackAdjustments);
+                }
+            }
+
+            if (AnarchySettingsState.TimewarpEnabled
+                && !suppressAnarchyTimewarp)
+            {
+                CurrentTrack.AddAdjustment(
+                    AdjustableProperty.Frequency,
+                    AnarchySettingsState.TimewarpRate);
             }
         }
     }

@@ -98,7 +98,17 @@ namespace osu.Game.Online
                 throw new InvalidOperationException($@"Retrieving statistics is not supported for ruleset {ruleset.ShortName}");
 
             var request = new GetUserRequest(api.LocalUser.Value.Id, ruleset);
-            request.Success += u => UpdateStatistics(u.Statistics, ruleset, callback);
+
+            request.Success += u =>
+            {
+                if (u.Statistics == null)
+                {
+                    statisticsCache.Remove(ruleset.ShortName);
+                    return;
+                }
+
+                UpdateStatistics(u.Statistics, ruleset, callback);
+            };
             api.Queue(request);
         }
 
