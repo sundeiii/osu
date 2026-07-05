@@ -52,6 +52,8 @@ namespace osu.Game.Screens.Select
 
         private Sample? sampleConfirmSelection { get; set; }
 
+        public override bool AllowLegacyFooterSkinning => true;
+        
         [BackgroundDependencyLoader]
         private void load(AudioManager audio)
         {

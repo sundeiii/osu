@@ -13,8 +13,10 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Threading;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
+using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Mods;
 using osu.Game.Screens.Menu;
@@ -49,9 +51,42 @@ namespace osu.Game.Screens.Footer
         private readonly List<OverlayContainer> overlays = new List<OverlayContainer>();
 
         private Box background = null!;
+        private GridContainer buttonsGrid = null!;
         private FillFlowContainer<ScreenFooterButton> buttonsFlow = null!;
         private Container overlayContentContainer = null!;
         private Container<ScreenFooterButton> hiddenButtonsContainer = null!;
+        private IDisposable? customUiHueBinding;
+
+        // ─── Torii: legacy footer integration hooks ─────────────────────────
+        // The legacy (stable-style) footer is owned by ScreenStackFooter (which is
+        // full-screen, as the legacy chrome must render inside a scaled container).
+        // These let it take over the footer cleanly when a legacy skin is active.
+
+        /// <summary>Whether a footer overlay (mod select etc.) currently owns the footer.</summary>
+        public bool HasActiveOverlay => ActiveOverlay != null;
+
+        /// <summary>Fired when an overlay starts/stops owning the footer.</summary>
+        public event Action? OverlayStateChanged;
+
+        /// <summary>
+        /// Whether the default lazer footer chrome is showing. False while the legacy footer has taken
+        /// over — in that case the default footer buttons are faded to alpha 0 and so leave the global
+        /// key-binding queue (IsPresent == false), which is why SongSelect drives their hotkeys instead.
+        /// </summary>
+        public bool DefaultChromeVisible { get; private set; } = true;
+
+        /// <summary>Show/hide the default lazer footer chrome (used when the legacy footer takes over).</summary>
+        public void SetDefaultChromeVisible(bool visible)
+        {
+            DefaultChromeVisible = visible;
+
+            background.FadeTo(visible ? 1 : 0, 120, Easing.OutQuint);
+            buttonsGrid.FadeTo(visible ? 1 : 0, 120, Easing.OutQuint);
+            BackButton.FadeTo(visible ? 1 : 0, 120, Easing.OutQuint);
+        }
+
+        /// <summary>Trigger the screen's footer button at the given index (legacy footer forwards to these).</summary>
+        public void TriggerFooterButton(int index) => buttonsFlow.ElementAtOrDefault(index)?.TriggerClick();
 
         private LogoTrackingContainer logoTrackingContainer = null!;
         private IDisposable? logoTracking;
@@ -78,8 +113,10 @@ namespace osu.Game.Screens.Footer
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuConfigManager config)
         {
+            colourProvider.ChangeColourScheme(CustomUiHueHelper.ResolveHue(config, OverlayColourScheme.Blue.GetHue(), CustomUiHueScope.Menu));
+
             InternalChildren = new Drawable[]
             {
                 background = new Box
@@ -87,7 +124,7 @@ namespace osu.Game.Screens.Footer
                     RelativeSizeAxes = Axes.Both,
                     Colour = colourProvider.Background5
                 },
-                new GridContainer
+                buttonsGrid = new GridContainer
                 {
                     RelativeSizeAxes = Axes.Both,
                     Padding = new MarginPadding { Left = OsuGame.SCREEN_EDGE_MARGIN + ScreenBackButton.BUTTON_WIDTH + padding },
@@ -145,7 +182,87 @@ namespace osu.Game.Screens.Footer
                     f.Position = new Vector2(-76, -36);
                 })),
             };
+
+            // Base hue: only applied when no overlay is "owning" the footer
+            // (when an overlay is active the footer mirrors that overlay's
+            // hue via updateColourScheme). Accent hue: pushed through
+            // unconditionally so the donator's chosen accent reads through
+            // mod buttons, BackButton, etc. even when the chrome is
+            // borrowing an overlay's hue.
+            customUiHueBinding = CustomUiHueHelper.BindHue(config, OverlayColourScheme.Blue.GetHue(), CustomUiHueScope.Menu, hue =>
+            {
+                if (ActiveOverlay != null)
+                    return;
+
+                if (background == null)
+                    colourProvider.ChangeColourScheme(hue);
+                else
+                    updateColourScheme(hue);
+            });
+
+            customUiAccentBinding = bindFooterAccent(config);
         }
+
+        [Resolved(CanBeNull = true)]
+        private IAPIProvider? api { get; set; }
+
+        private IDisposable bindFooterAccent(OsuConfigManager config)
+        {
+            var accentEnabled = config.GetBindable<bool>(OsuSetting.CustomUIAccentEnabled);
+            var accentHue = config.GetBindable<float>(OsuSetting.CustomUIAccentHue);
+            var hueEnabled = config.GetBindable<bool>(OsuSetting.CustomUIHueEnabled);
+            var applyToMenu = config.GetBindable<bool>(OsuSetting.CustomUIHueApplyToMenu);
+            var accentUnlocked = config.GetBindable<bool>(OsuSetting.CustomUIAccentUnlocked);
+            var localUser = api?.LocalUser.GetBoundCopy();
+
+            void apply()
+            {
+                // Mirror the central CustomUiHueHelper.ResolveAccentHue gate so
+                // the footer's accent obeys the same store-unlock check as every
+                // other surface (chrome / overlays / settings panel).
+                bool active = hueEnabled.Value && applyToMenu.Value && accentEnabled.Value && accentUnlocked.Value;
+
+                if (active)
+                    colourProvider.ChangeAccentColourScheme((int)accentHue.Value);
+                else
+                    colourProvider.ResetAccentToBase();
+            }
+
+            accentEnabled.BindValueChanged(_ => apply());
+            accentHue.BindValueChanged(_ => apply());
+            hueEnabled.BindValueChanged(_ => apply());
+            applyToMenu.BindValueChanged(_ => apply());
+            accentUnlocked.BindValueChanged(_ => apply());
+            localUser?.BindValueChanged(_ => apply(), true);
+
+            // If api wasn't available (test scenes etc.), fall back to
+            // the original immediate apply so the footer still resolves.
+            if (localUser == null)
+                apply();
+
+            return new FooterAccentSubscription(() =>
+            {
+                accentEnabled.UnbindAll();
+                accentHue.UnbindAll();
+                hueEnabled.UnbindAll();
+                applyToMenu.UnbindAll();
+                accentUnlocked.UnbindAll();
+                localUser?.UnbindAll();
+            });
+        }
+
+        private sealed class FooterAccentSubscription : IDisposable
+        {
+            private Action? unsubscribe;
+            public FooterAccentSubscription(Action unsubscribe) { this.unsubscribe = unsubscribe; }
+            public void Dispose()
+            {
+                unsubscribe?.Invoke();
+                unsubscribe = null;
+            }
+        }
+
+        private IDisposable? customUiAccentBinding;
 
         private ScheduledDelegate? changeLogoDepthDelegate;
 
@@ -250,6 +367,7 @@ namespace osu.Game.Screens.Footer
             }
 
             ActiveOverlay = overlay;
+            OverlayStateChanged?.Invoke();
 
             Debug.Assert(temporarilyHiddenButtons.Count == 0);
 
@@ -326,6 +444,7 @@ namespace osu.Game.Screens.Footer
 
             activeOverlayContent = null;
             ActiveOverlay = null;
+            OverlayStateChanged?.Invoke();
         }
 
         private void updateColourScheme(int hue)
@@ -372,6 +491,19 @@ namespace osu.Game.Screens.Footer
             }
 
             BackButtonPressed?.Invoke();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                customUiHueBinding?.Dispose();
+                customUiHueBinding = null;
+                customUiAccentBinding?.Dispose();
+                customUiAccentBinding = null;
+            }
+
+            base.Dispose(isDisposing);
         }
 
         public partial class BackReceptor : Drawable, IKeyBindingHandler<GlobalAction>

@@ -1,0 +1,15 @@
+diff --git a/osu.Game/Screens/Select/SoloSongSelect.cs b/osu.Game/Screens/Select/SoloSongSelect.cs
+index 270d8f326a..731ec866ff 100644
+--- a/osu.Game/Screens/Select/SoloSongSelect.cs
++++ b/osu.Game/Screens/Select/SoloSongSelect.cs
+@@ -29,6 +29,10 @@ public partial class SoloSongSelect : SongSelect
+     {
+         protected override UserActivity InitialActivity => new UserActivity.ChoosingBeatmap();
+ 
++        // Torii: the legacy stable-style footer (back button + mode/mods/random/options
++        // + user rank/pp banner) takes over here when a legacy skin is active.
++        public override bool AllowLegacyFooterSkinning => true;
++
+         private PlayerLoader? playerLoader;
+         private IReadOnlyList<Mod>? modsAtGameplayStart;
+ 

@@ -39,6 +39,8 @@ namespace osu.Game.Screens.Select
 
         private const float corner_radius = 10;
 
+        public Bindable<string> SearchQuery => searchTextBox.Current;
+
         public IBindable<BeatmapSetInfo?> ScopedBeatmapSet { get; } = new Bindable<BeatmapSetInfo?>();
 
         private SongSelectSearchTextBox searchTextBox = null!;

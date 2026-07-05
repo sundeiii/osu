@@ -2,11 +2,16 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
+using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Skinning;
+using osu.Game.Skinning.Select;
+using osuTK;
 
 namespace osu.Game.Screens.Footer
 {
@@ -39,6 +44,29 @@ namespace osu.Game.Screens.Footer
 
         private readonly ScreenStackTracker screenTracker;
 
+        // ─── Torii: legacy (stable-style) song-select footer ────────────────
+        // frenzibyte's upstream PRs add the skinnable legacy footer but leave it
+        // unmounted. We render it here (ScreenStackFooter is full-screen) inside a
+        // DrawSizePreservingFillContainer at the same 1366x768 logical space the PR
+        // calibrates its coordinates against, then hand the default footer chrome
+        // off to it when a legacy skin is active on an opted-in screen (song select).
+        [Resolved]
+        private SkinManager skins { get; set; } = null!;
+
+        [Resolved]
+        private OsuConfigManager config { get; set; } = null!;
+
+        private readonly IBindable<Skin> currentSkin = new Bindable<Skin>();
+        private Bindable<bool> footerUseSkin = null!;
+        // torii: toggle independiente del footer legacy. el footer legacy se muestra si el stable esta
+        // prendido (footerUseSkin) O si este toggle standalone esta prendido.
+        private Bindable<bool> legacyFooterStandalone = null!;
+        private DrawSizePreservingFillContainer? legacyFooterContainer;
+        private LegacyFooter? legacyFooter;
+        private bool legacyFooterLoading;
+        private int legacyFooterGeneration;
+        private bool allowLegacyFooterSkinning;
+
         public ScreenStackFooter(ScreenStack screenStack, ScreenFooter.BackReceptor? backReceptor = null)
         {
             RelativeSizeAxes = Axes.Both;
@@ -62,6 +90,111 @@ namespace osu.Game.Screens.Footer
             screenTracker.ScreenChanged += onScreenChanged;
 
             backButtonVisibility.ValueChanged += onBackButtonVisibilityChanged;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            currentSkin.BindTo(skins.CurrentSkin);
+            currentSkin.BindValueChanged(_ => onSkinChanged());
+
+            // Rebuild the legacy footer when the "skin the footer" toggle changes so it
+            // applies live (it reads the setting once at construction).
+            footerUseSkin = config.GetBindable<bool>(OsuSetting.ToriiLegacyFooterUseSkin);
+            footerUseSkin.BindValueChanged(_ => onSkinChanged());
+
+            // The standalone "Legacy footer" toggle only flips whether the footer is mounted, so a plain
+            // updateLegacyFooter (lazy-load + fade) is enough - no full skin teardown needed.
+            legacyFooterStandalone = config.GetBindable<bool>(OsuSetting.ToriiLegacySongSelectFooter);
+            legacyFooterStandalone.BindValueChanged(_ => updateLegacyFooter());
+
+            // When an overlay (mod select etc.) takes/leaves the footer, the legacy
+            // chrome must step aside / return.
+            Footer.OverlayStateChanged += updateLegacyFooter;
+        }
+
+        private void onSkinChanged()
+        {
+            // The legacy footer reads its textures from the skin at load time, so a skin
+            // change must drop and rebuild it. The generation bump cancels an in-flight load.
+            legacyFooterGeneration++;
+
+            if (legacyFooterContainer != null)
+            {
+                RemoveInternal(legacyFooterContainer, true);
+                legacyFooterContainer = null;
+                legacyFooter = null;
+            }
+
+            legacyFooterLoading = false;
+            updateLegacyFooter();
+        }
+
+        private void updateLegacyFooter()
+        {
+            // torii: el footer legacy se muestra cuando la pantalla lo permite Y (el stable song select
+            // esta prendido O el toggle standalone del footer esta prendido) Y no hay overlay activo.
+            // antes el gate era "hay un skin legacy activo", lo que mostraba el footer ignorando el toggle.
+            bool active = allowLegacyFooterSkinning
+                          && (footerUseSkin.Value || legacyFooterStandalone.Value)
+                          && !Footer.HasActiveOverlay;
+
+            if (active)
+                ensureLegacyFooterLoaded();
+
+            legacyFooterContainer?.FadeTo(active ? 1 : 0, 120, Easing.OutQuint);
+
+            // Hand the default lazer footer chrome off to the legacy footer (or take it back).
+            Footer.SetDefaultChromeVisible(!active);
+        }
+
+        private void ensureLegacyFooterLoaded()
+        {
+            if (legacyFooter != null || legacyFooterLoading)
+                return;
+
+            legacyFooterLoading = true;
+            int generation = legacyFooterGeneration;
+
+            var footer = new LegacyFooter
+            {
+                Anchor = Anchor.BottomLeft,
+                Origin = Anchor.BottomLeft,
+                RelativeSizeAxes = Axes.X,
+                // Torii: nudge the whole footer down a few logical px so its content sits flush
+                // on the screen bottom (closes the small gap the bottom-anchored elements leave).
+                Y = 4,
+                // The legacy footer drives the real song-select actions via the default footer.
+                BackAction = () => BackButtonPressed?.Invoke(),
+                ModsAction = () => Footer.TriggerFooterButton(0),
+                RandomAction = () => Footer.TriggerFooterButton(1),
+                OptionsAction = () => Footer.TriggerFooterButton(2),
+            };
+
+            // Render at the same 1366x768 logical space the upstream PR calibrates against,
+            // so the stable-derived pixel coordinates land correctly at any resolution.
+            var container = new DrawSizePreservingFillContainer
+            {
+                RelativeSizeAxes = Axes.Both,
+                TargetDrawSize = new Vector2(1366, 768),
+                Alpha = 0,
+                Child = footer,
+            };
+
+            LoadComponentAsync(container, loaded =>
+            {
+                if (generation != legacyFooterGeneration)
+                {
+                    loaded.Dispose();
+                    return;
+                }
+
+                legacyFooter = footer;
+                legacyFooterContainer = loaded;
+                legacyFooterLoading = false;
+                AddInternal(loaded);
+                updateLegacyFooter();
+            });
         }
 
         private void onScreenChanged(IScreen lastScreen, IScreen newScreen)
@@ -92,10 +225,16 @@ namespace osu.Game.Screens.Footer
             {
                 ((BindableBool)backButtonVisibility).Value = true;
 
+                allowLegacyFooterSkinning = false;
+                updateLegacyFooter();
+
                 Footer.SetButtons([]);
                 Footer.Hide();
                 return;
             }
+
+            allowLegacyFooterSkinning = osuScreen.ShowFooter && osuScreen.AllowLegacyFooterSkinning;
+            updateLegacyFooter();
 
             if (osuScreen.ShowFooter)
             {
@@ -137,6 +276,8 @@ namespace osu.Game.Screens.Footer
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
+
+            Footer.OverlayStateChanged -= updateLegacyFooter;
 
             screenTracker.Dispose();
         }

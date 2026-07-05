@@ -301,6 +301,9 @@ namespace osu.Game.Online.API.Requests.Responses
         [JsonProperty("replays_watched_counts")]
         public APIUserHistoryCount[] ReplaysWatchedCounts;
 
+        [JsonProperty("has_supported")]
+        public bool HasSupported;
+
         /// <summary>
         /// All user statistics per ruleset's short name (in the case of a <see cref="GetUsersRequest"/> or <see cref="GetMeRequest"/> response).
         /// Otherwise empty. Can be altered for testing purposes.

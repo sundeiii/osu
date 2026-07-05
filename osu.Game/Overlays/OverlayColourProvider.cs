@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osuTK.Graphics;
 
 namespace osu.Game.Overlays
@@ -8,9 +9,17 @@ namespace osu.Game.Overlays
     public class OverlayColourProvider
     {
         /// <summary>
+        /// Fired when the colour provider changes and drawables should re-apply colours.
+        /// Torii compatibility hook.
+        /// </summary>
+        public event Action? ColoursChanged;
+
+        /// <summary>
         /// The hue degree associated with the colour shades provided by this <see cref="OverlayColourProvider"/>.
         /// </summary>
         public int Hue { get; private set; }
+
+        private readonly int baseHue;
 
         public OverlayColourProvider(OverlayColourScheme colourScheme)
             : this(colourScheme.GetHue())
@@ -20,12 +29,9 @@ namespace osu.Game.Overlays
         public OverlayColourProvider(int hue)
         {
             Hue = hue;
+            baseHue = hue;
         }
 
-        // Note that the following five colours are also defined in `OsuColour` as `{colourScheme}{0,1,2,3,4}`.
-        // The difference as to which should be used where comes down to context.
-        // If the colour in question is supposed to always match the view in which it is displayed theme-wise, use `OverlayColourProvider`.
-        // If the colour usage is special and in general differs from the surrounding view in choice of hue, use the `OsuColour` constants.
         public Color4 Colour0 => getColour(1, 0.8f);
         public Color4 Colour1 => getColour(1, 0.7f);
         public Color4 Colour2 => getColour(0.8f, 0.6f);
@@ -53,19 +59,37 @@ namespace osu.Game.Overlays
         public Color4 Background5 => getColour(0.1f, 0.15f);
         public Color4 Background6 => getColour(0.1f, 0.1f);
 
-        /// <summary>
-        /// Changes the <see cref="Hue"/> to a different degree.
-        /// Note that this does not trigger any kind of signal to any drawable that received colours from here, all drawables need to be updated manually.
-        /// </summary>
-        /// <param name="colourScheme">The proposed colour scheme.</param>
         public void ChangeColourScheme(OverlayColourScheme colourScheme) => ChangeColourScheme(colourScheme.GetHue());
 
+        public void ChangeColourScheme(int hue)
+        {
+            Hue = hue;
+            ColoursChanged?.Invoke();
+        }
+
         /// <summary>
-        /// Changes the <see cref="Hue"/> to a different degree.
-        /// Note that this does not trigger any kind of signal to any drawable that received colours from here, all drawables need to be updated manually.
+        /// Torii compatibility hook used by footer/custom hue code.
         /// </summary>
-        /// <param name="hue">The proposed hue degree.</param>
-        public void ChangeColourScheme(int hue) => Hue = hue;
+        public void ChangeAccentColourScheme(float hue)
+        {
+            Hue = normaliseHue(hue);
+            ColoursChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Torii compatibility hook used by footer/custom hue code.
+        /// </summary>
+        public void ResetAccentToBase()
+        {
+            Hue = baseHue;
+            ColoursChanged?.Invoke();
+        }
+
+        private static int normaliseHue(float hue)
+        {
+            int result = (int)MathF.Round(hue) % 360;
+            return result < 0 ? result + 360 : result;
+        }
 
         private Color4 getColour(float saturation, float lightness) => Framework.Graphics.Colour4.FromHSL(Hue / 360f, saturation, lightness);
     }

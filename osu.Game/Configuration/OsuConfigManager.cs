@@ -68,6 +68,17 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.SongSelectBackgroundBlur, false);
 
+            SetDefault(OsuSetting.ToriiLegacyFooterUseSkin, true);
+            SetDefault(OsuSetting.ToriiLegacySongSelectFooter, false);
+
+            SetDefault(OsuSetting.CustomUIHueEnabled, false);
+            SetDefault(OsuSetting.CustomUIHue, 320f);
+            SetDefault(OsuSetting.CustomUIHueApplyToMenu, true);
+            SetDefault(OsuSetting.CustomUIHueApplyToOverlays, true);
+            SetDefault(OsuSetting.CustomUIHueApplyToSettingsPanel, true);
+            SetDefault(OsuSetting.CustomUIAccentEnabled, false);
+            SetDefault(OsuSetting.CustomUIAccentHue, 250f);
+            SetDefault(OsuSetting.CustomUIAccentUnlocked, false);
             // Online settings
             SetDefault(OsuSetting.Username, string.Empty);
             SetDefault(OsuSetting.Token, string.Empty);
@@ -403,7 +414,16 @@ namespace osu.Game.Configuration
         /// This is added to the audio track's current time. Higher values will cause gameplay to occur earlier, relative to the audio track.
         /// </summary>
         AudioOffset,
-
+        ToriiLegacyFooterUseSkin,
+        ToriiLegacySongSelectFooter,
+        CustomUIHueEnabled,
+        CustomUIHue,
+        CustomUIHueApplyToMenu,
+        CustomUIHueApplyToOverlays,
+        CustomUIHueApplyToSettingsPanel,
+        CustomUIAccentEnabled,
+        CustomUIAccentHue,
+        CustomUIAccentUnlocked,
         VolumeInactive,
         MenuMusic,
         MenuVoice,
