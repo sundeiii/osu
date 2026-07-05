@@ -367,7 +367,7 @@ namespace osu.Game.Screens.Select
 
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
 
-            legacyUi = config.GetBindable<bool>(OsuSetting.ToriiLegacyFooterUseSkin);
+            legacyUi = config.GetBindable<bool>(OsuSetting.ToriiLegacySongSelectFooter);
             legacyUi.BindValueChanged(e =>
             {
                 if (e.NewValue && this.IsCurrentScreen())

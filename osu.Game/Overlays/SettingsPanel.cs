@@ -19,6 +19,7 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Settings;
@@ -70,6 +71,10 @@ namespace osu.Game.Overlays
 
         private Task sectionsLoadingTask;
 
+        private IDisposable? customUiHueBinding;
+
+        private bool reloadingForHueChange;
+
         public IBindable<SettingsSection> CurrentSection = new Bindable<SettingsSection>();
 
         [Cached]
@@ -85,8 +90,18 @@ namespace osu.Game.Overlays
         protected virtual IEnumerable<SettingsSection> CreateSections() => null;
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuConfigManager config)
         {
+            customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                config,
+                colourProvider,
+                OverlayColourScheme.Purple.GetHue(),
+                CustomUiHueScope.SettingsPanel,
+                null
+            );
+
+            colourProvider.ColoursChanged += onColoursChanged;
+
             InternalChild = ContentContainer = new NonMaskedContent
             {
                 X = -WIDTH + ExpandedPosition,
@@ -301,6 +316,39 @@ namespace osu.Game.Overlays
             protected override bool ComputeIsMaskedAway(RectangleF maskingBounds) => false;
         }
 
+        private void onColoursChanged()
+        {
+            if (!IsLoaded || reloadingForHueChange)
+                return;
+
+            Schedule(() =>
+            {
+                if (!IsLoaded || reloadingForHueChange)
+                    return;
+
+                reloadingForHueChange = true;
+
+                try
+                {
+                    SettingsSection? current = CurrentSection.Value;
+
+                    SectionsContainer.Clear();
+                    Sidebar.Clear();
+
+                    sectionsLoadingTask = null;
+
+                    loadSections();
+
+                    if (current != null)
+                        CurrentSection.Value = current;
+                }
+                finally
+                {
+                    reloadingForHueChange = false;
+                }
+            });
+        }
+
         public partial class SettingsSectionsContainer : SectionsContainer<SettingsSection>
         {
             public SearchContainer<SettingsSection> SearchContainer;
@@ -338,6 +386,14 @@ namespace osu.Game.Overlays
                 // no null check because the usage of this class is strict
                 HeaderBackground!.Alpha = -ExpandableHeader!.Y / ExpandableHeader.LayoutSize.Y;
             }
+        }
+        
+        protected override void Dispose(bool isDisposing)
+        {
+            customUiHueBinding?.Dispose();
+            colourProvider.ColoursChanged -= onColoursChanged;
+
+            base.Dispose(isDisposing);
         }
     }
 }

@@ -68,17 +68,18 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.SongSelectBackgroundBlur, false);
 
-            SetDefault(OsuSetting.ToriiLegacyFooterUseSkin, true);
+            SetDefault(OsuSetting.ToriiLegacyFooterUseSkin, false);
             SetDefault(OsuSetting.ToriiLegacySongSelectFooter, false);
 
             SetDefault(OsuSetting.CustomUIHueEnabled, false);
-            SetDefault(OsuSetting.CustomUIHue, 320f);
+            SetDefault(OsuSetting.CustomUIHue, 320f, 0f, 359f, 1f);
             SetDefault(OsuSetting.CustomUIHueApplyToMenu, true);
             SetDefault(OsuSetting.CustomUIHueApplyToOverlays, true);
             SetDefault(OsuSetting.CustomUIHueApplyToSettingsPanel, true);
             SetDefault(OsuSetting.CustomUIAccentEnabled, false);
-            SetDefault(OsuSetting.CustomUIAccentHue, 250f);
-            SetDefault(OsuSetting.CustomUIAccentUnlocked, false);
+            SetDefault(OsuSetting.CustomUIAccentHue, 250f, 0f, 359f, 1f);
+            SetDefault(OsuSetting.CustomUIAccentUnlocked, true);
+            SetDefault(OsuSetting.UITheme, UIThemeOption.Torii);
             // Online settings
             SetDefault(OsuSetting.Username, string.Empty);
             SetDefault(OsuSetting.Token, string.Empty);
@@ -283,6 +284,9 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.EditorSubmissionNotifyOnDiscussionReplies, true);
             SetDefault(OsuSetting.EditorSubmissionLoadInBrowserAfterSubmission, true);
 
+            SetDefault(OsuSetting.MenuCursorStyle, osu.Game.Graphics.Cursor.MenuCursorStyle.LazerDefault);
+            SetDefault(OsuSetting.UseGameplayCursorInMenus, false);
+
             // GU specific settings
             SetDefault(OsuSetting.DisableAutomaticUpdates, false);
 
@@ -416,6 +420,7 @@ namespace osu.Game.Configuration
         AudioOffset,
         ToriiLegacyFooterUseSkin,
         ToriiLegacySongSelectFooter,
+        UITheme,
         CustomUIHueEnabled,
         CustomUIHue,
         CustomUIHueApplyToMenu,
@@ -502,7 +507,8 @@ namespace osu.Game.Configuration
         EditorShowSpeedChanges,
         TouchDisableGameplayTaps,
         ModSelectTextSearchStartsActive,
-
+        MenuCursorStyle,
+        UseGameplayCursorInMenus,
         /// <summary>
         /// The status for the current user to broadcast to other players.
         /// </summary>

@@ -294,7 +294,7 @@ namespace osu.Game.Graphics.Containers
 
             // torii: el fondo del dim de layout busca layout-background primero (fallback a menu-background)
             // asi el skinner puede shippear una imagen distinta para esta capa.
-            protected override string SkinBackgroundLookupName => @"layout-background";
+            // protected override string SkinBackgroundLookupName => @"layout-background";
 
             public override void OnEntering(ScreenTransitionEvent e)
             {

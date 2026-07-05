@@ -51,6 +51,49 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                     Keywords = [@"delay"],
                     ApplyClassicDefault = c => ((IHasCurrentValue<double>)c).Current.Value = 0,
                 },
+                new SettingsItemV2(new FormEnumDropdown<osu.Game.Graphics.Cursor.MenuCursorStyle>
+                {
+                    Caption = "Menu cursor",
+                    HintText = "Choose how the cursor should look in menus.",
+                    Current = config.GetBindable<osu.Game.Graphics.Cursor.MenuCursorStyle>(OsuSetting.MenuCursorStyle),
+                })
+                {
+                    Keywords = new[] { "cursor", "skin", "gameplay", "menu" },
+                },
+                new UIThemeDropdownAndRestart(),
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Custom UI hue",
+                    HintText = "Apply a custom colour hue to interface panels.",
+                    Current = config.GetBindable<bool>(OsuSetting.CustomUIHueEnabled),  })
+                {
+                    Keywords = new[] { "colour", "color", "theme", "hue", "ui" }
+                },
+                new SettingsItemV2(new FormHuePicker
+                {
+                    Caption = "UI hue",
+                    Current = config.GetBindable<float>(OsuSetting.CustomUIHue),
+                })
+                {
+                    Keywords = new[] { "colour", "color", "theme", "hue", "ui" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Separate accent hue",
+                    HintText = "Use a separate accent colour for highlights.",
+                    Current = config.GetBindable<bool>(OsuSetting.CustomUIAccentEnabled),
+                })
+                {
+                    Keywords = new[] { "accent", "colour", "color", "theme", "hue" }
+                },
+                new SettingsItemV2(new FormHuePicker
+                {
+                    Caption = "Accent hue",
+                    Current = config.GetBindable<float>(OsuSetting.CustomUIAccentHue),
+                })
+                {
+                    Keywords = new[] { "accent", "colour", "color", "theme", "hue" }
+                },
             };
         }
     }

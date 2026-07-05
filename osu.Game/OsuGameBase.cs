@@ -386,6 +386,7 @@ namespace osu.Game
 
             dependencies.Cache(SessionStatics = new SessionStatics());
             dependencies.Cache(hitErrorTracker = new SessionAverageHitErrorTracker());
+            OsuColour.SetThemeFromConfig(LocalConfig.Get<UIThemeOption>(OsuSetting.UITheme));
             dependencies.Cache(Colours = new OsuColour());
 
             RegisterImportHandler(BeatmapManager);

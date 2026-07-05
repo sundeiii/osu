@@ -263,6 +263,8 @@ namespace osu.Game
         private bool tabletLogNotifyOnError = true;
         private int generalLogRecentCount;
 
+        public void SetLegacyScreenAspectLock(float? aspectRatio) => ScreenContainer.SetForcedAspectRatio(aspectRatio);
+        
         public OsuGame(string[] args = null)
         {
             this.args = args;
@@ -1999,7 +2001,7 @@ namespace osu.Game
             [BackgroundDependencyLoader]
             private void load()
             {
-                Logger.Log("[restriction-refresh] showing restricted popup", LoggingTarget.Network);
+                //Logger.Log("[restriction-refresh] showing restricted popup", LoggingTarget.Network);
                 string reason = string.IsNullOrWhiteSpace(user.RestrictionReason)
                     ? "No reason provided"
                     : user.RestrictionReason;
@@ -2040,7 +2042,7 @@ namespace osu.Game
             [BackgroundDependencyLoader]
             private void load()
             {
-                Logger.Log("[restriction-refresh] showing unrestricted popup", LoggingTarget.Network);
+                //Logger.Log("[restriction-refresh] showing unrestricted popup", LoggingTarget.Network);
 
                 HeaderText = "Your account has been unrestricted";
 

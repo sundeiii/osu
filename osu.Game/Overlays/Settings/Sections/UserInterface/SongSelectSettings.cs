@@ -29,6 +29,24 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 {
                     Keywords = new[] { "converts", "converted" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Use classic song select",
+                    HintText = "Use the legacy-style song select layout.",
+                    Current = config.GetBindable<bool>(OsuSetting.ToriiLegacySongSelectFooter),
+                })
+                {
+                    Keywords = new[] { "classic", "legacy", "stable", "song select", "old" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Use beatmap selection skin elements",
+                    HintText = "Use classic song select textures from the current skin, such as songselect-bottom and selection buttons.",
+                    Current = config.GetBindable<bool>(OsuSetting.ToriiLegacyFooterUseSkin),
+                })
+                {
+                    Keywords = new[] { "classic", "legacy", "stable", "skin", "songselect", "selection", "footer" }
+                },
                 new SettingsItemV2(new FormEnumDropdown<RandomSelectAlgorithm>
                 {
                     Caption = UserInterfaceStrings.RandomSelectionAlgorithm,

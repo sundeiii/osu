@@ -78,6 +78,8 @@ namespace osu.Game.Screens.Select
 
         private partial class SearchTextBox : FocusedTextBox
         {
+            public override bool HandleLeftRightArrows => false;
+            
             public SearchTextBox()
             {
                 PlaceholderText = @"Type to search!";
