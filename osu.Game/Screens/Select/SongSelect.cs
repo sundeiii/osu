@@ -123,6 +123,11 @@ namespace osu.Game.Screens.Select
         private BeatmapTitleWedge titleWedge = null!;
         private BeatmapDetailsArea detailsArea = null!;
         private FillFlowContainer wedgesContainer = null!;
+        private Drawable legacyTopContainer = null!;
+        private Drawable legacyLeaderboardContainer = null!;
+        private Bindable<bool> legacyUi = null!;
+        private bool rebuildingLegacyChrome;
+
         private Box rightGradientBackground = null!;
         private Container mainContent = null!;
         private SkinnableContainer skinnableContent = null!;
@@ -163,6 +168,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private IOverlayManager? overlayManager { get; set; }
+
+        [Resolved]
+        private ISkinSource skinSource { get; set; } = null!;
 
         private InputManager inputManager = null!;
 
@@ -311,6 +319,38 @@ namespace osu.Game.Screens.Select
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
                 },
+                legacyTopContainer = new DrawSizePreservingFillContainer
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    TargetDrawSize = new Vector2(1366, 768),
+                    Strategy = DrawSizePreservationStrategy.Minimum,
+                    Alpha = 0,
+                    Child = new LegacySongSelectTop
+                    {
+                        Anchor = Anchor.TopLeft,
+                        Origin = Anchor.TopLeft,
+                        RelativeSizeAxes = Axes.Both,
+                        FilterControl = FilterControl,
+                    },
+                },
+                legacyLeaderboardContainer = new DrawSizePreservingFillContainer
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    TargetDrawSize = new Vector2(1366, 768),
+                    Strategy = DrawSizePreservationStrategy.Minimum,
+                    Alpha = 0,
+                    Child = new OsuContextMenuContainer
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Child = new LegacyLeaderboard
+                        {
+                            Anchor = Anchor.TopLeft,
+                            Origin = Anchor.TopLeft,
+                            RelativeSizeAxes = Axes.Both,
+                            HoverScrollRequested = () => carousel.ScrollToSelection(),
+                        },
+                    },
+                },
                 modSpeedHotkeyHandler = new ModSpeedHotkeyHandler()
             });
 
@@ -326,6 +366,15 @@ namespace osu.Game.Screens.Select
             });
 
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
+
+            legacyUi = config.GetBindable<bool>(OsuSetting.ToriiLegacyFooterUseSkin);
+            legacyUi.BindValueChanged(e =>
+            {
+                if (e.NewValue && this.IsCurrentScreen())
+                    rebuildLegacyChrome();
+                else
+                    updateLegacyChrome();
+            }, true);
         }
 
         // Colour scheme for mod overlay is left as default (green) to match mods button.
@@ -400,6 +449,9 @@ namespace osu.Game.Screens.Select
                 if (ShowOsuLogo)
                     logo?.FadeTo(v.NewValue == Visibility.Visible ? 0f : 1f, 200, Easing.OutQuint);
             });
+
+            skinSource.SourceChanged += onSkinChangedWhileLegacy;
+            updateLegacyChrome();
         }
 
         protected override void Update()
@@ -419,6 +471,76 @@ namespace osu.Game.Screens.Select
 
             if (this.IsCurrentScreen())
                 updateDebounce();
+        }
+
+        private void updateLegacyChrome()
+        {
+            if (FilterControl == null || wedgesContainer == null || legacyTopContainer == null || legacyLeaderboardContainer == null)
+                return;
+
+            bool legacy = legacyUi.Value;
+
+            (game as OsuGame)?.SetLegacyScreenAspectLock(legacy ? 1366f / 768f : null);
+
+            // Hide lazer chrome only.
+            FilterControl.FadeTo(legacy ? 0 : 1, 200, Easing.OutQuint);
+            wedgesContainer.FadeTo(legacy ? 0 : 1, 200, Easing.OutQuint);
+            rightGradientBackground.FadeTo(legacy ? 0 : 1, 200, Easing.OutQuint);
+
+            // Keep mainGridContainer visible so the beatmap carousel stays visible.
+            mainGridContainer.FadeTo(1, 200, Easing.OutQuint);
+
+            // Show Torii/stable chrome.
+            legacyTopContainer.FadeTo(legacy ? 1 : 0, 200, Easing.OutQuint);
+            legacyLeaderboardContainer.FadeTo(legacy ? 1 : 0, 200, Easing.OutQuint);
+        }
+
+        private void onSkinChangedWhileLegacy()
+        {
+            if (!legacyUi.Value || !this.IsCurrentScreen())
+                return;
+
+            Schedule(rebuildLegacyChrome);
+        }
+
+        private void rebuildLegacyChrome()
+        {
+            if (rebuildingLegacyChrome || !this.IsCurrentScreen())
+                return;
+
+            if (legacyTopContainer is not Container topContainer || legacyLeaderboardContainer is not Container leaderboardContainer)
+                return;
+
+            rebuildingLegacyChrome = true;
+
+            try
+            {
+                topContainer.Child = new LegacySongSelectTop
+                {
+                    Anchor = Anchor.TopLeft,
+                    Origin = Anchor.TopLeft,
+                    RelativeSizeAxes = Axes.Both,
+                    FilterControl = FilterControl,
+                };
+
+                leaderboardContainer.Child = new OsuContextMenuContainer
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Child = new LegacyLeaderboard
+                    {
+                        Anchor = Anchor.TopLeft,
+                        Origin = Anchor.TopLeft,
+                        RelativeSizeAxes = Axes.Both,
+                        HoverScrollRequested = () => carousel.ScrollToSelection(),
+                    },
+                };
+            }
+            finally
+            {
+                rebuildingLegacyChrome = false;
+            }
+
+            updateLegacyChrome();
         }
 
         #region Selection debounce
@@ -718,6 +840,9 @@ namespace osu.Game.Screens.Select
 
             carousel.VisuallyFocusSelected = false;
 
+            (game as OsuGame)?.SetLegacyScreenAspectLock(legacyUi.Value ? 1366f / 768f : null);
+            updateLegacyChrome();
+
             if (ControlGlobalMusic)
             {
                 // Avoid abruptly starting playback at preview point.
@@ -755,6 +880,8 @@ namespace osu.Game.Screens.Select
         private void onLeavingScreen()
         {
             restoreBackground();
+
+            (game as OsuGame)?.SetLegacyScreenAspectLock(null);
 
             Beatmap.ValueChanged -= updateVariousState;
 
@@ -825,6 +952,14 @@ namespace osu.Game.Screens.Select
             // After the carousel finishes filtering, it will attempt a selection then call this method again.
             if (!CarouselItemsPresented && !checkBeatmapValidForSelection(Beatmap.Value.BeatmapInfo))
                 return;
+
+            if (legacyUi?.Value == true)
+            {
+                titleWedge.Hide();
+                detailsArea.Hide();
+                FilterControl.Hide();
+                return;
+            }
 
             if (carousel.VisuallyFocusSelected)
             {
@@ -1293,6 +1428,8 @@ namespace osu.Game.Screens.Select
         {
             base.Dispose(isDisposing);
             modSelectOverlayRegistration?.Dispose();
+            if (skinSource != null)
+                skinSource.SourceChanged -= onSkinChangedWhileLegacy;
         }
     }
 }
