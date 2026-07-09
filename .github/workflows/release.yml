@@ -245,10 +245,18 @@ jobs:
           find Releases -maxdepth 2 -type f -print || true
 
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            if [ -f "Releases/Setup.exe" ]; then
-              cp "Releases/Setup.exe" "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-Setup.exe"
-            fi
+            # Copy any Velopack installer exe if it exists.
+            for f in Releases/*.exe Releases/**/*.exe; do
+              if [ -f "$f" ]; then
+                cp "$f" "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-Setup.exe"
+                break
+              fi
+            done
 
+            # Also create a normal portable zip so Windows always has a downloadable build.
+            powershell -NoProfile -Command "Compress-Archive -Path 'publish/${{ matrix.runtime }}/*' -DestinationPath 'release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-portable.zip' -Force"
+
+            # Keep Velopack update files too.
             for f in Releases/*.nupkg Releases/RELEASES*; do
               cp "$f" release-assets/
             done
