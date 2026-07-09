@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -314,14 +314,14 @@ namespace osu.Game.Beatmaps
                     mod.ApplyToDifficulty(converted.Difficulty);
                 }
             }
-            
+
             // Anarchy AR override.
             if (AnarchySettingsState.ApproachRateEnabled)
             {
                 converted.Difficulty.ApproachRate =
                     (float)AnarchySettingsState.ApproachRate;
             }
-                    
+
 
             var processor = rulesetInstance.CreateBeatmapProcessor(converted);
 

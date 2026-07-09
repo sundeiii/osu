@@ -1,5 +1,4 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
-// This file is partly modified by GooGuTeam.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -274,7 +273,7 @@ namespace osu.Game
         private int generalLogRecentCount;
 
         public void SetLegacyScreenAspectLock(float? aspectRatio) => ScreenContainer.SetForcedAspectRatio(aspectRatio);
-        
+
         public OsuGame(string[] args = null)
         {
             this.args = args;
@@ -2109,7 +2108,7 @@ namespace osu.Game
                 Icon = FontAwesome.Solid.InfoCircle,
             }));
         }
-        
+
         private partial class RestrictedAccountDialog : PopupDialog
         {
             private readonly APIUser user;

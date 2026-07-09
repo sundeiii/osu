@@ -92,7 +92,7 @@ namespace osu.Game.Overlays.Dashboard.Friends
                 if (panel.User.OnlineID != userId)
                     continue;
 
-                
+
 
                 if (online)
                     panel.User.LastVisit = DateTimeOffset.Now;
@@ -129,7 +129,7 @@ namespace osu.Game.Overlays.Dashboard.Friends
                 }
             }
         }
-        
+
         private bool isUserOnline(APIUser user) => user.WasRecentlyOnline || friendPresences.ContainsKey(user.OnlineID);
 
         private FilterableUserPanel createUserPanel(APIUser user)

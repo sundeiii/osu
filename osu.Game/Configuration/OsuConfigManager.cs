@@ -1,5 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
-// This file is partly modified by GooGuTeam.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -201,7 +200,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.AnarchyApproachRateEnabled, false);
 
-            
+
             SetDefault(
                 OsuSetting.AnarchyApproachRate,
                 -1.0,
@@ -225,8 +224,8 @@ namespace osu.Game.Configuration
 
             GetBindable<double>(OsuSetting.AnarchyApproachRate).BindValueChanged(
                 change => AnarchySettingsState.ApproachRate = change.NewValue,
-                true);    
-                
+                true);
+
             // Update
             SetDefault(OsuSetting.ReleaseStream, ReleaseStream.Lazer);
 

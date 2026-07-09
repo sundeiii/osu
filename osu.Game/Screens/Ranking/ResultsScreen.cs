@@ -118,7 +118,7 @@ namespace osu.Game.Screens.Ranking
                                     && player != null
                                     && player is not ReplayPlayer
                                     && !Score.User.IsBot;
-            
+
             bool useCleanResultsScreen = config.Get<ResultScreenStyle>(OsuSetting.ResultScreenStyle) == ResultScreenStyle.Clean;
 
             InternalChild = new PopoverContainer

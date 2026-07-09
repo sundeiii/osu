@@ -297,7 +297,7 @@ namespace osu.Game.Graphics.UserInterfaceV2
         private partial class FormDropdownMenu : OsuDropdownMenu
         {
             private OverlayColourProvider colourProvider = null!;
-            
+
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colourProvider)
             {
