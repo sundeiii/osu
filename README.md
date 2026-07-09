@@ -4,7 +4,7 @@
 
 # osu! GU
 
-> This is a fork of [ppy/osu](https://github.com/ppy/osu) maintained by **GooGuTeam**. It includes the following changes on top of the upstream osu!(lazer) client to work better with [g0v0-server](https://github.com/GooGuTeam/g0v0-server).
+> This is a fork of [ppy/osu](https://github.com/ppy/osu) maintained by **Rinari team**. It includes the following changes on top of the upstream osu!(lazer) client to work better with [g0v0-server](https://github.com/GooGuTeam/g0v0-server).
 
 ## Changes from upstream
 
@@ -34,7 +34,7 @@
 
 ### Update source
 
-- Desktop update checks and mobile update notifications point to the **GooGuTeam/osu** GitHub repository.
+- Desktop update checks and mobile update notifications point to the **sundeiii/osu** GitHub repository.
 - A new **Disable automatic updates** option is available in the update settings.
 
 ### Error reporting

@@ -49,9 +49,9 @@ namespace osu.Game.Overlays.Settings.Sections.General
 
             Add(new SettingsCheckbox
             {
-                LabelText = "Disable automatic updates (GU)",
+                LabelText = "Disable automatic updates (Rinari)",
                 Current = config.GetBindable<bool>(OsuSetting.DisableAutomaticUpdates),
-                Keywords = new[] { "update", "automatic", "disable", "gu" },
+                Keywords = new[] { "update", "automatic", "disable", "rinari" },
             });
 
             // For simplicity, hide the concept of release streams from mobile users.
