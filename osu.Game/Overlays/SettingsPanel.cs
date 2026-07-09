@@ -71,9 +71,9 @@ namespace osu.Game.Overlays
 
         private Task sectionsLoadingTask;
 
-        private IDisposable? customUiHueBinding;
+        private IDisposable customUiHueBinding;
 
-        private bool reloadingForHueChange;
+        private Box backgroundBox;
 
         public IBindable<SettingsSection> CurrentSection = new Bindable<SettingsSection>();
 
@@ -99,8 +99,7 @@ namespace osu.Game.Overlays
                 CustomUiHueScope.SettingsPanel,
                 null
             );
-
-            colourProvider.ColoursChanged += onColoursChanged;
+            colourProvider.ColoursChanged += updateColours;
 
             InternalChild = ContentContainer = new NonMaskedContent
             {
@@ -109,13 +108,12 @@ namespace osu.Game.Overlays
                 RelativeSizeAxes = Axes.Y,
                 Children = new Drawable[]
                 {
-                    new Box
+                    backgroundBox = new Box
                     {
                         Anchor = Anchor.TopRight,
                         Origin = Anchor.TopRight,
                         Scale = new Vector2(2, 1), // over-extend to the left for transitions
                         RelativeSizeAxes = Axes.Both,
-                        Colour = colourProvider.Background4,
                         Alpha = 1,
                     },
                     loading = new LoadingLayer
@@ -124,6 +122,8 @@ namespace osu.Game.Overlays
                     }
                 }
             };
+
+            updateColours();
 
             Add(new PopoverContainer
             {
@@ -310,48 +310,23 @@ namespace osu.Game.Overlays
             }
         }
 
+        private void updateColours()
+        {
+            backgroundBox.Colour = colourProvider.Background4;
+            SectionsContainer?.Invalidate(Invalidation.DrawNode);
+        }
+
         private partial class NonMaskedContent : Container<Drawable>
         {
             // masking breaks the pan-out transform with nested sub-settings panels.
             protected override bool ComputeIsMaskedAway(RectangleF maskingBounds) => false;
         }
 
-        private void onColoursChanged()
-        {
-            if (!IsLoaded || reloadingForHueChange)
-                return;
-
-            Schedule(() =>
-            {
-                if (!IsLoaded || reloadingForHueChange)
-                    return;
-
-                reloadingForHueChange = true;
-
-                try
-                {
-                    SettingsSection? current = CurrentSection.Value;
-
-                    SectionsContainer.Clear();
-                    Sidebar.Clear();
-
-                    sectionsLoadingTask = null;
-
-                    loadSections();
-
-                    if (current != null)
-                        CurrentSection.Value = current;
-                }
-                finally
-                {
-                    reloadingForHueChange = false;
-                }
-            });
-        }
-
         public partial class SettingsSectionsContainer : SectionsContainer<SettingsSection>
         {
             public SearchContainer<SettingsSection> SearchContainer;
+
+            private OverlayColourProvider colourProvider;
 
             public string SearchTerm
             {
@@ -370,28 +345,44 @@ namespace osu.Game.Overlays
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colourProvider)
             {
+                this.colourProvider = colourProvider;
+                colourProvider.ColoursChanged += updateColours;
+
                 HeaderBackground = new Box
                 {
-                    Colour = colourProvider.Background5,
                     RelativeSizeAxes = Axes.Both
                 };
 
                 SearchContainer.FilterCompleted += InvalidateScrollPosition;
+
+                updateColours();
             }
 
             protected override void UpdateAfterChildren()
             {
                 base.UpdateAfterChildren();
 
-                // no null check because the usage of this class is strict
                 HeaderBackground!.Alpha = -ExpandableHeader!.Y / ExpandableHeader.LayoutSize.Y;
             }
+            private void updateColours()
+            {
+                if (HeaderBackground != null)
+                    HeaderBackground.Colour = colourProvider.Background5;
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                if (colourProvider != null)
+                    colourProvider.ColoursChanged -= updateColours;
+
+                base.Dispose(isDisposing);
+            }
         }
-        
+
         protected override void Dispose(bool isDisposing)
         {
             customUiHueBinding?.Dispose();
-            colourProvider.ColoursChanged -= onColoursChanged;
+            colourProvider.ColoursChanged -= updateColours;
 
             base.Dispose(isDisposing);
         }

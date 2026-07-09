@@ -94,6 +94,24 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 {
                     Keywords = new[] { "accent", "colour", "color", "theme", "hue" }
                 },
+                new SettingsItemV2(new FormEnumDropdown<ResultScreenStyle>
+                {
+                    Caption = "Results screen style",
+                    HintText = "Choose which results screen layout to use.",
+                    Current = config.GetBindable<ResultScreenStyle>(OsuSetting.ResultScreenStyle),
+                })
+                {
+                    Keywords = new[] { "results", "ranking", "score", "clean", "stable" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Auto-hide toolbar",
+                    HintText = "Hide the top toolbar until the cursor is near the top of the screen.",
+                    Current = config.GetBindable<bool>(OsuSetting.ToriiAutoHideToolbar),
+                })
+                {
+                    Keywords = new[] { "toolbar", "auto hide", "autohide", "top bar" }
+                },
             };
         }
     }

@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Screens.Footer;
@@ -24,6 +25,9 @@ namespace osu.Game.Overlays.Mods
 
         [Cached]
         public readonly OverlayColourProvider ColourProvider;
+
+        private IDisposable? customUiHueBinding;
+        private Box backgroundBox = null!;
 
         /// <summary>
         /// The overlay's header.
@@ -70,17 +74,25 @@ namespace osu.Game.Overlays.Mods
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuConfigManager config)
         {
+            customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                config,
+                ColourProvider,
+                ColourProvider.Hue,
+                CustomUiHueScope.Overlays,
+                null
+            );
+
+            ColourProvider.ColoursChanged += updateColours;
             Child = TopLevelContent = new Container
             {
                 RelativeSizeAxes = Axes.Both,
                 Children = new Drawable[]
                 {
-                    new Box
+                    backgroundBox = new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = ColourProvider.Background6.Opacity(0.75f),
                     },
                     Header = new ShearedOverlayHeader
                     {
@@ -100,8 +112,12 @@ namespace osu.Game.Overlays.Mods
                     },
                 }
             };
+            updateColours();
         }
-
+        private void updateColours()
+        {
+            backgroundBox.Colour = ColourProvider.Background6.Opacity(0.75f);
+        }
         public VisibilityContainer? DisplayedFooterContent { get; private set; }
 
         /// <summary>
@@ -171,6 +187,13 @@ namespace osu.Game.Overlays.Mods
                     hideFooterOnPopOut = false;
                 }
             }
+        }
+        protected override void Dispose(bool isDisposing)
+        {
+            customUiHueBinding?.Dispose();
+            ColourProvider.ColoursChanged -= updateColours;
+
+            base.Dispose(isDisposing);
         }
     }
 }

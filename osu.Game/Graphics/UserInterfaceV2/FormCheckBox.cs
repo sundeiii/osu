@@ -42,6 +42,7 @@ namespace osu.Game.Graphics.UserInterfaceV2
 
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
+        private bool coloursBound;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -84,6 +85,9 @@ namespace osu.Game.Graphics.UserInterfaceV2
                     },
                 },
             };
+
+            colourProvider.ColoursChanged += updateState;
+            coloursBound = true;
         }
 
         protected override void LoadComplete()
@@ -141,5 +145,13 @@ namespace osu.Game.Graphics.UserInterfaceV2
         public bool IsDisabled => Current.Disabled;
 
         public float MainDrawHeight => DrawHeight;
+        
+        protected override void Dispose(bool isDisposing)
+        {
+            if (coloursBound)
+                colourProvider.ColoursChanged -= updateState;
+
+            base.Dispose(isDisposing);
+        }
     }
 }

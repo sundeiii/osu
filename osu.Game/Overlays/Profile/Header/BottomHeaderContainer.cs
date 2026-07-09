@@ -25,6 +25,9 @@ namespace osu.Game.Overlays.Profile.Header
     {
         public readonly Bindable<UserProfileData?> User = new Bindable<UserProfileData?>();
 
+        private OverlayColourProvider colourProvider = null!;
+
+        private Box background = null!;
         private LinkFlowContainer topLinkContainer = null!;
         private LinkFlowContainer bottomLinkContainer = null!;
 
@@ -41,14 +44,14 @@ namespace osu.Game.Overlays.Profile.Header
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider)
         {
-            iconColour = colourProvider.Foreground1;
+            this.colourProvider = colourProvider;
+            colourProvider.ColoursChanged += updateColours;
 
             InternalChildren = new Drawable[]
             {
-                new Box
+                background = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background4
                 },
                 new FillFlowContainer
                 {
@@ -73,7 +76,18 @@ namespace osu.Game.Overlays.Profile.Header
                 }
             };
 
+            updateColours();
+
             User.BindValueChanged(user => updateDisplay(user.NewValue?.User));
+        }
+
+        private void updateColours()
+        {
+            background.Colour = colourProvider.Background4;
+            iconColour = colourProvider.Foreground1;
+
+            if (topLinkContainer != null && bottomLinkContainer != null)
+                updateDisplay(User.Value?.User);
         }
 
         private void updateDisplay(APIUser? user)
@@ -153,10 +167,10 @@ namespace osu.Game.Overlays.Profile.Header
 
             if (!string.IsNullOrEmpty(user.Twitter))
                 anyInfoAdded |= tryAddInfo(FontAwesome.Brands.Twitter, "@" + user.Twitter, $@"https://twitter.com/{user.Twitter}");
+
             anyInfoAdded |= tryAddInfo(FontAwesome.Brands.Discord, user.Discord);
             anyInfoAdded |= tryAddInfo(FontAwesome.Solid.Link, websiteWithoutProtocol, user.Website);
 
-            // If no information was added to the bottomLinkContainer, hide it to avoid unwanted padding
             bottomLinkContainer.Alpha = anyInfoAdded ? 1 : 0;
         }
 
@@ -166,7 +180,6 @@ namespace osu.Game.Overlays.Profile.Header
         {
             if (string.IsNullOrEmpty(content)) return false;
 
-            // newlines could be contained in API returned user content.
             content = content.Replace('\n', ' ');
 
             bottomLinkContainer.AddIcon(icon, text =>
@@ -185,5 +198,13 @@ namespace osu.Game.Overlays.Profile.Header
         }
 
         private void embolden(SpriteText text) => text.Font = text.Font.With(weight: FontWeight.Bold);
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (colourProvider != null)
+                colourProvider.ColoursChanged -= updateColours;
+        }
     }
 }

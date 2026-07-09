@@ -100,11 +100,32 @@ namespace osu.Game.Online.API
                 var existingFriends = friends.Select(f => f.TargetID).ToHashSet();
                 var updatedFriends = res.Select(f => f.TargetID).ToHashSet();
 
-                // Add new friends into local list.
-                friends.AddRange(res.Where(r => !existingFriends.Contains(r.TargetID)));
-
                 // Remove non-friends from local list.
                 friends.RemoveAll(f => !updatedFriends.Contains(f.TargetID));
+
+                foreach (var relation in res)
+                {
+                    var existing = friends.FirstOrDefault(f => f.TargetID == relation.TargetID);
+
+                    if (existing == null)
+                    {
+                        friends.Add(relation);
+                        continue;
+                    }
+
+                    bool changed =
+                        existing.TargetUser?.WasRecentlyOnline != relation.TargetUser?.WasRecentlyOnline
+                        || existing.TargetUser?.LastVisit != relation.TargetUser?.LastVisit
+                        || existing.TargetUser?.Username != relation.TargetUser?.Username
+                        || existing.TargetUser?.AvatarUrl != relation.TargetUser?.AvatarUrl;
+
+                    if (!changed)
+                        continue;
+
+                    // Replace stale relation so dashboard / notifiers receive a collection event.
+                    friends.Remove(existing);
+                    friends.Add(relation);
+                }
             };
 
             api.Queue(friendsReq);

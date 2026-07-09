@@ -148,6 +148,8 @@ namespace osu.Game.Graphics.UserInterfaceV2
             [Resolved]
             private OverlayColourProvider colourProvider { get; set; } = null!;
 
+            private bool coloursBound;
+
             [BackgroundDependencyLoader]
             private void load()
             {
@@ -196,6 +198,9 @@ namespace osu.Game.Graphics.UserInterfaceV2
                         }
                     },
                 };
+
+                colourProvider.ColoursChanged += updateState;
+                coloursBound = true;
             }
 
             protected override void LoadComplete()
@@ -257,6 +262,14 @@ namespace osu.Game.Graphics.UserInterfaceV2
                 chevron.ScaleTo(open ? new Vector2(1f, -1f) : Vector2.One, 300, Easing.OutQuint);
                 chevron.MoveToY(open ? -chevron.DrawHeight : 0, 300, Easing.OutQuint);
             }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                if (coloursBound)
+                    colourProvider.ColoursChanged -= updateState;
+
+                base.Dispose(isDisposing);
+            }
         }
 
         private partial class FormDropdownSearchBar : DropdownSearchBar
@@ -283,14 +296,33 @@ namespace osu.Game.Graphics.UserInterfaceV2
 
         private partial class FormDropdownMenu : OsuDropdownMenu
         {
+            private OverlayColourProvider colourProvider = null!;
+            
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colourProvider)
             {
+                this.colourProvider = colourProvider;
+                colourProvider.ColoursChanged += updateColours;
+
                 ItemsContainer.Padding = new MarginPadding(9);
 
                 MaskingContainer.BorderThickness = FormControlBackground.BORDER_THICKNESS;
                 MaskingContainer.CornerExponent = FormControlBackground.CORNER_EXPONENT;
+
+                updateColours();
+            }
+
+            private void updateColours()
+            {
                 MaskingContainer.BorderColour = colourProvider.Highlight1;
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                if (colourProvider != null)
+                    colourProvider.ColoursChanged -= updateColours;
+
+                base.Dispose(isDisposing);
             }
 
             protected override void AnimateOpen()

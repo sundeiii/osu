@@ -158,6 +158,13 @@ namespace osu.Game.Screens.Play
         protected SkipOverlay SkipIntroOverlay { get; private set; }
         private SkipOverlay skipOutroOverlay;
 
+        private SkipBreakOverlay skipBreakOverlay;
+        private SkipBreakBriefingOverlay skipBreakBriefingOverlay;
+
+        private Bindable<bool> skipBreaksEnabled;
+        private Bindable<bool> skipBreaksSingleConfirmation;
+        private Bindable<bool> skipBreaksBriefingSeen;
+
         protected ScoreProcessor ScoreProcessor { get; private set; }
 
         protected HealthProcessor HealthProcessor { get; private set; }
@@ -291,6 +298,10 @@ namespace osu.Game.Screens.Play
             config.BindWith(OsuSetting.BeatmapSkins, rulesetSkinProvider.BeatmapSkins);
             config.BindWith(OsuSetting.BeatmapColours, rulesetSkinProvider.BeatmapColours);
             config.BindWith(OsuSetting.BeatmapHitsounds, rulesetSkinProvider.BeatmapHitsounds);
+
+            skipBreaksEnabled = config.GetBindable<bool>(OsuSetting.ToriiSkipBreaksEnabled);
+            skipBreaksSingleConfirmation = config.GetBindable<bool>(OsuSetting.ToriiSkipBreaksSingleConfirmation);
+            skipBreaksBriefingSeen = config.GetBindable<bool>(OsuSetting.ToriiSkipBreaksBriefingSeen);
 
             GameplayClockContainer.Add(new GameplayScrollWheelHandling());
 
@@ -517,6 +528,13 @@ namespace osu.Game.Screens.Play
                         RequestSkip = () => progressToResults(false),
                         Alpha = 0
                     },
+                    (skipBreakOverlay = skipBreaksEnabled.Value && AllowBreakSkipping
+                        ? new SkipBreakOverlay(breakTracker, skipBreaksSingleConfirmation, skipBreaksBriefingSeen)
+                        {
+                            RequestSkip = PerformBreakSkip,
+                            RequestBriefing = showSkipBreakBriefing,
+                        }
+                        : null) ?? (Drawable)new Container(),
                     DrawableRuleset.ResumeOverlay?.CreateProxy() ?? new Container(),
                     PauseOverlay = new PauseOverlay
                     {
@@ -525,6 +543,9 @@ namespace osu.Game.Screens.Play
                         OnRetry = () => Restart(),
                         OnQuit = () => PerformExitWithConfirmation(),
                     },
+                    (skipBreakBriefingOverlay = skipBreakOverlay != null
+                        ? new SkipBreakBriefingOverlay(skipBreaksSingleConfirmation) { OnDismiss = onSkipBreakBriefingDismissed }
+                        : null) ?? (Drawable)new Container(),
                 },
             };
 
@@ -532,6 +553,8 @@ namespace osu.Game.Screens.Play
             {
                 SkipIntroOverlay.Expire();
                 skipOutroOverlay.Expire();
+                skipBreakOverlay?.Expire();
+                skipBreakBriefingOverlay?.Expire();
             }
 
             return container;
@@ -731,6 +754,45 @@ namespace osu.Game.Screens.Play
             // return samplePlaybackDisabled.Value to what is defined by the beatmap's current state
             updateSampleDisabledState();
         }
+
+        protected void PerformBreakSkip(double seekTarget)
+        {
+            if (!Configuration.AllowSkipping || !AllowBreakSkipping)
+                return;
+
+            if (seekTarget <= GameplayClockContainer.CurrentTime)
+                return;
+
+            samplePlaybackDisabled.Value = true;
+            GameplayClockContainer.Seek(seekTarget);
+
+            (DrawableRuleset.FrameStableClock as FrameStabilityContainer)?.RequestDirectSeek();
+
+            updateSampleDisabledState();
+        }
+
+        protected virtual bool AllowBreakSkipping => Configuration.AllowPause;
+
+        private void showSkipBreakBriefing()
+        {
+            if (skipBreakBriefingOverlay == null)
+                return;
+
+            if (skipBreakBriefingOverlay.State.Value == Visibility.Visible)
+                return;
+
+            GameplayClockContainer.Stop();
+            skipBreakBriefingOverlay.Show();
+        }
+
+        private void onSkipBreakBriefingDismissed()
+        {
+            skipBreaksBriefingSeen.Value = true;
+
+            if (!GameplayState.HasFailed && !GameplayState.HasPassed)
+                GameplayClockContainer.Start();
+        }
+
 
         /// <summary>
         /// Seek to a specific time in gameplay.

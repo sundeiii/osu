@@ -27,6 +27,8 @@ namespace osu.Game.Graphics.UserInterfaceV2
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
 
+        private bool coloursBound;
+
         public bool ExpandOnCurrent { get; init; } = true;
 
         private Sample? sampleChecked;
@@ -67,6 +69,9 @@ namespace osu.Game.Graphics.UserInterfaceV2
         {
             base.LoadComplete();
 
+            colourProvider.ColoursChanged += updateStateInstant;
+            coloursBound = true;
+
             Current.BindDisabledChanged(_ => updateState());
             Current.BindValueChanged(_ => updateState(), true);
 
@@ -98,19 +103,26 @@ namespace osu.Game.Graphics.UserInterfaceV2
             else
                 sampleUnchecked?.Play();
         }
+        private void updateStateInstant()
+        {
+            updateState();
+            FinishTransforms(true);
+            fill.FinishTransforms(true);
+            content.FinishTransforms(true);
+        }
 
         private void updateState()
         {
-            Color4 fillColour = colourProvider.Background5.Opacity(0);
-            Color4 borderColour = colourProvider.Light4;
+            Color4 fillColour = colourProvider.Highlight1.Opacity(0);
+            Color4 borderColour = colourProvider.Highlight1.Opacity(0.8f);
 
             if (IsHovered)
                 borderColour = colourProvider.Highlight1;
             else if (Current.Value)
-                borderColour = colourProvider.Highlight1.Darken(0.1f);
+                borderColour = colourProvider.Highlight1;
 
             if (Current.Value)
-                fillColour = borderColour;
+                fillColour = colourProvider.Highlight1;
 
             if (Current.Disabled)
             {
@@ -126,6 +138,14 @@ namespace osu.Game.Graphics.UserInterfaceV2
                 content.ResizeWidthTo(1f, 200, Easing.OutElasticQuarter);
             else
                 content.ResizeWidthTo(0.75f, 120, Easing.OutExpo);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (coloursBound)
+                colourProvider.ColoursChanged -= updateStateInstant;
+
+            base.Dispose(isDisposing);
         }
     }
 }

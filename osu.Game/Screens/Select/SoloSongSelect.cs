@@ -29,6 +29,10 @@ namespace osu.Game.Screens.Select
     {
         protected override UserActivity InitialActivity => new UserActivity.ChoosingBeatmap();
 
+        // Torii: the legacy stable-style footer (back button + mode/mods/random/options
+        // + user rank/pp banner) takes over here when a legacy skin is active.
+        public override bool AllowLegacyFooterSkinning => true;
+
         private PlayerLoader? playerLoader;
         private IReadOnlyList<Mod>? modsAtGameplayStart;
 
@@ -52,8 +56,6 @@ namespace osu.Game.Screens.Select
 
         private Sample? sampleConfirmSelection { get; set; }
 
-        public override bool AllowLegacyFooterSkinning => true;
-        
         [BackgroundDependencyLoader]
         private void load(AudioManager audio)
         {
@@ -75,6 +77,11 @@ namespace osu.Game.Screens.Select
 
                 if (beatmap.GetOnlineURL(api, Ruleset.Value) is string url)
                     yield return new OsuMenuItem(CommonStrings.CopyLink, MenuItemType.Standard, () => game?.CopyToClipboard(url));
+
+                // torii: link al osu! oficial tambien desde la dificultad individual
+                // (ya estaba en la tarjeta del set, faltaba aca).
+                if (beatmap.GetOfficialOnlineURL(Ruleset.Value) is string osuUrl)
+                    yield return new OsuMenuItem("Copy osu! link", MenuItemType.Standard, () => game?.CopyToClipboard(osuUrl));
 
                 yield return new OsuMenuItemSpacer();
             }

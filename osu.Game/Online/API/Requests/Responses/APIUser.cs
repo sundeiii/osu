@@ -133,6 +133,9 @@ namespace osu.Game.Online.API.Requests.Responses
         [JsonProperty(@"is_online")]
         public bool WasRecentlyOnline;
 
+        [JsonProperty(@"current_clients")]
+        public string[] CurrentClients = Array.Empty<string>();
+
         [JsonProperty(@"pm_friends_only")]
         public bool PMFriendsOnly;
 

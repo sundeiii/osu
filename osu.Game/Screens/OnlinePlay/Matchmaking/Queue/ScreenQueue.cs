@@ -21,6 +21,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
 using osu.Game.Database;
@@ -408,7 +409,23 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Queue
 
         private async Task populateAvailablePools()
         {
-            MatchmakingPool[] pools = await client.GetMatchmakingPoolsOfType(poolType).ConfigureAwait(false);
+            Logger.Log($"[RankedPlayDebug] Loading matchmaking pools for type={poolType}", LoggingTarget.Network);
+
+            MatchmakingPool[] pools;
+
+            try
+            {
+                pools = await client.GetMatchmakingPoolsOfType(poolType).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"[RankedPlayDebug] Failed to load matchmaking pools for type={poolType}");
+                pools = Array.Empty<MatchmakingPool>();
+            }
+
+            Logger.Log(
+                $"[RankedPlayDebug] Got {pools.Length} matchmaking pools: {string.Join(", ", pools.Select(p => $"id={p.Id} name={p.Name} ruleset={p.RulesetId} type={p.Type}"))}",
+                LoggingTarget.Network);
 
             Schedule(() =>
             {

@@ -19,6 +19,7 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Game.Audio;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -55,15 +56,20 @@ namespace osu.Game.Screens.Ranking
         protected ScorePanelList ScorePanelList { get; private set; } = null!;
 
         protected VerticalScrollContainer VerticalScrollContent { get; private set; } = null!;
+        protected int? StableCountryMapRank { get; set; }
 
         [Resolved]
         private Player? player { get; set; }
+
+        [Resolved]
+        private OsuConfigManager config { get; set; } = null!;
 
         private bool skipExitTransition;
 
         protected StatisticsPanel StatisticsPanel { get; private set; } = null!;
 
         private Drawable bottomPanel = null!;
+        private StableResultsPanel? stableResultsPanel;
         private Container<ScorePanel> detachedPanelContainer = null!;
 
         private Task lastFetchTask = Task.CompletedTask;
@@ -103,6 +109,18 @@ namespace osu.Game.Screens.Ranking
 
             popInSample = audio.Samples.Get(@"UI/overlay-pop-in");
 
+            bool playApplause = Score != null
+                                && player != null
+                                && !Score.User.IsBot;
+
+            bool showProfileUpdate = Score != null
+                                    && IsLocalPlay
+                                    && player != null
+                                    && player is not ReplayPlayer
+                                    && !Score.User.IsBot;
+            
+            bool useCleanResultsScreen = config.Get<ResultScreenStyle>(OsuSetting.ResultScreenStyle) == ResultScreenStyle.Clean;
+
             InternalChild = new PopoverContainer
             {
                 RelativeSizeAxes = Axes.Both,
@@ -123,6 +141,28 @@ namespace osu.Game.Screens.Ranking
                                     Children = new Drawable[]
                                     {
                                         new GlobalScrollAdjustsVolume(),
+                                        Score != null && useCleanResultsScreen
+                                            ? new FillFlowContainer
+                                            {
+                                                Anchor = Anchor.Centre,
+                                                Origin = Anchor.Centre,
+                                                AutoSizeAxes = Axes.Both,
+                                                Direction = FillDirection.Horizontal,
+                                                Spacing = new Vector2(18, 0),
+                                                Children = new Drawable[]
+                                                {
+                                                    stableResultsPanel = new StableResultsPanel(Score, playApplause),
+                                                    showProfileUpdate
+                                                        ? new StableProfileDeltaPanel(Score, true)
+                                                        : new Container
+                                                        {
+                                                            Anchor = Anchor.Centre,
+                                                            Origin = Anchor.Centre,
+                                                            Size = Vector2.Zero,
+                                                        },
+                                                }
+                                            }
+                                            : new Container(),
                                         StatisticsPanel = new StatisticsPanel
                                         {
                                             RelativeSizeAxes = Axes.Both,
@@ -132,6 +172,8 @@ namespace osu.Game.Screens.Ranking
                                         ScorePanelList = new ScorePanelList
                                         {
                                             RelativeSizeAxes = Axes.Both,
+                                            Alpha = useCleanResultsScreen ? 0 : 1,
+                                            HandleInput = !useCleanResultsScreen,
                                             SelectedScore = { BindTarget = SelectedScore },
                                             PostExpandAction = () => StatisticsPanel.ToggleVisibility()
                                         },
@@ -182,7 +224,7 @@ namespace osu.Game.Screens.Ranking
             if (Score != null)
             {
                 // only show flair / animation when arriving after watching a play that isn't autoplay.
-                bool shouldFlair = player != null && !Score.User.IsBot;
+                bool shouldFlair = !useCleanResultsScreen && showProfileUpdate;
 
                 ScorePanelList.AddScore(Score, shouldFlair);
                 // this is mostly for medal display.
@@ -241,6 +283,7 @@ namespace osu.Game.Screens.Ranking
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
 
+            // Stable-style result screen: do not fetch extra carousel scores.
             fetchScores(null);
         }
 
@@ -377,7 +420,7 @@ namespace osu.Game.Screens.Ranking
                     // This can happen if for example a beatmap that is part of a playlist hasn't been played yet.
                     VerticalScrollContent.Add(new MessagePlaceholder(LeaderboardStrings.NoRecordsYet));
                 }
-
+                updateStablePanelMapRank(scores);
                 OnScoresAdded(scores);
             });
 
@@ -436,6 +479,36 @@ namespace osu.Game.Screens.Ranking
         }
 
         private ScorePanel? detachedPanel;
+
+        private void updateStablePanelMapRank(ScoreInfo[] scores)
+        {
+            if (Score == null || stableResultsPanel == null)
+                return;
+
+            int? globalRank = Score.Position;
+
+            if (globalRank == null || globalRank <= 0)
+            {
+                for (int i = 0; i < scores.Length; i++)
+                {
+                    if (Score.OnlineID > 0 && scores[i].OnlineID == Score.OnlineID)
+                    {
+                        globalRank = scores[i].Position ?? i + 1;
+                        break;
+                    }
+
+                    if (scores[i].User.OnlineID == Score.User.OnlineID
+                        && scores[i].TotalScore == Score.TotalScore
+                        && scores[i].MaxCombo == Score.MaxCombo)
+                    {
+                        globalRank = scores[i].Position ?? i + 1;
+                        break;
+                    }
+                }
+            }
+
+            stableResultsPanel.UpdateMapRanks(globalRank, StableCountryMapRank);
+        }
 
         private void onStatisticsStateChanged(ValueChangedEvent<Visibility> state)
         {
@@ -554,3 +627,8 @@ namespace osu.Game.Screens.Ranking
         }
     }
 }
+
+
+
+
+

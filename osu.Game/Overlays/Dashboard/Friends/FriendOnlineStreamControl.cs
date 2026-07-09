@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -65,13 +65,15 @@ namespace osu.Game.Overlays.Dashboard.Friends
             countOnline.Value = 0;
             countOffline.Value = 0;
 
-            foreach (var user in apiFriends)
-            {
-                if (friendPresences.ContainsKey(user.TargetID))
-                    countOnline.Value++;
-                else
-                    countOffline.Value++;
-            }
+        foreach (var user in apiFriends)
+        {
+            bool isOnline = user.TargetUser?.WasRecentlyOnline == true || friendPresences.ContainsKey(user.TargetID);
+
+            if (isOnline)
+                countOnline.Value++;
+            else
+                countOffline.Value++;
+        }
         }
 
         protected override OverlayStreamItem<OnlineStatus> CreateStreamItem(OnlineStatus value)

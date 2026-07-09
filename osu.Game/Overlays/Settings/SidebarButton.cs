@@ -12,6 +12,8 @@ namespace osu.Game.Overlays.Settings
     {
         protected const double FADE_DURATION = 500;
 
+        private bool coloursBound;
+
         [Resolved]
         protected OverlayColourProvider ColourProvider { get; private set; } = null!;
 
@@ -22,6 +24,14 @@ namespace osu.Game.Overlays.Settings
 
         [BackgroundDependencyLoader]
         private void load()
+        {
+            ColourProvider.ColoursChanged += updateColours;
+            coloursBound = true;
+
+            updateColours();
+        }
+
+        private void updateColours()
         {
             BackgroundColour = ColourProvider.Background5;
             Hover.Colour = ColourProvider.Light4;
@@ -45,6 +55,14 @@ namespace osu.Game.Overlays.Settings
         protected virtual void UpdateState()
         {
             Hover.FadeTo(IsHovered ? 0.1f : 0, FADE_DURATION, Easing.OutQuint);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (coloursBound)
+                ColourProvider.ColoursChanged -= updateColours;
         }
     }
 }

@@ -79,9 +79,9 @@ namespace osu.Game
     public partial class OsuGameBase : Framework.Game, ICanAcceptFiles, IBeatSyncProvider
     {
 #if DEBUG
-        public const string GAME_NAME = "osu! GU (development)";
+        public const string GAME_NAME = "Rinari Lazer (development)";
 #else
-        public const string GAME_NAME = "osu! GU";
+        public const string GAME_NAME = "Rinari Lazer";
 #endif
 
         public const string OSU_PROTOCOL = "osu://";

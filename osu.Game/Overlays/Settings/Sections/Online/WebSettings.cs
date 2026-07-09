@@ -20,8 +20,6 @@ namespace osu.Game.Overlays.Settings.Sections.Online
     {
         protected override LocalisableString Header => OnlineSettingsStrings.WebHeader;
 
-        private FormTextBox customApiUrlTextBox = null!;
-
         private readonly Bindable<SettingsNote.Data?> customApiNote = new Bindable<SettingsNote.Data?>();
 
         [BackgroundDependencyLoader]
@@ -58,19 +56,7 @@ namespace osu.Game.Overlays.Settings.Sections.Online
                 {
                     Keywords = new[] { "nsfw", "18+", "offensive" }
                 },
-                new SettingsItemV2(customApiUrlTextBox = new FormTextBox
-                {
-                    Caption = OnlineSettingsStrings.CustomApiUrl,
-                    Current = config.GetBindable<string>(OsuSetting.CustomApiUrl),
-                    PlaceholderText = api.Endpoints.APIUrl,
-                })
-                {
-                    Keywords = new[] { "api", "server", "custom", "endpoint" },
-                    Note = { BindTarget = customApiNote },
-                },
             };
-
-            customApiUrlTextBox.Current.BindValueChanged(onCustomApiUrlChanged, true);
         }
 
         private string lastApiUrl = string.Empty;
@@ -86,42 +72,6 @@ namespace osu.Game.Overlays.Settings.Sections.Online
             @"(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})" +
             @")(?::(?<port>\d{1,5}))?$",
             options: RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-        private void onCustomApiUrlChanged(ValueChangedEvent<string> e)
-        {
-            if (isInitialLoad)
-            {
-                string initRaw = e.NewValue.Trim();
-                lastApiUrl = normalizeToHttps(initRaw);
-                isInitialLoad = false;
-                return;
-            }
-
-            pendingValidation?.Cancel();
-            pendingValidation = Scheduler.AddDelayed(() =>
-            {
-                string rawInput = (customApiUrlTextBox.Current.Value ?? string.Empty).Trim();
-
-                if (string.IsNullOrWhiteSpace(rawInput))
-                {
-                    maybeShowRestartIfChanged(string.Empty);
-                    customApiNote.Value = null;
-                    return;
-                }
-
-                string hostPort = stripSchemeAndPath(rawInput);
-
-                if (!isValidHostPort(hostPort))
-                {
-                    customApiNote.Value = new SettingsNote.Data(OnlineSettingsStrings.CustomApiUrlInvalid, SettingsNote.Type.Critical);
-                    return;
-                }
-
-                string normalised = "https://" + hostPort;
-                customApiNote.Value = null;
-                maybeShowRestartIfChanged(normalised);
-            }, debounce_delay);
-        }
 
         private static bool isValidHostPort(string hostPort)
         {

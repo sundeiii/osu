@@ -35,7 +35,7 @@ namespace osu.Game.Skinning.Select
         private Sprite levelBar = null!;
         private UpdateableAvatar avatar = null!;
         private SkinnableSound hoverSound = null!;
-        private IBindable<APIUser> localUser = null!;
+
         [Resolved]
         private LocalUserStatisticsProvider userStatisticsProvider { get; set; } = null!;
 
@@ -48,13 +48,14 @@ namespace osu.Game.Skinning.Select
         [Resolved]
         private UserProfileOverlay? profileOverlay { get; set; }
 
+        [Resolved]
+        private IAPIProvider api { get; set; } = null!;
+
         private APIUser? currentUser;
 
         [BackgroundDependencyLoader]
-        private void load(IAPIProvider api)
+        private void load()
         {
-            localUser = api.LocalUser.GetBoundCopy();
-            
             AutoSizeAxes = Axes.Both;
 
             // reference: https://github.com/peppy/osu-stable-reference/blob/c34a74fb61c17c5667486a12548485d1f03baa2e/osu!/Online/Drawable/User.cs#L622
@@ -120,9 +121,7 @@ namespace osu.Game.Skinning.Select
             base.LoadComplete();
 
             userStatisticsProvider.StatisticsUpdated += onStatisticsUpdated;
-
-            localUser.BindValueChanged(_ => updateDisplay(), true);
-            ruleset.BindValueChanged(_ => updateDisplay());
+            ruleset.BindValueChanged(_ => updateDisplay(), true);
         }
 
         private void onStatisticsUpdated(UserStatisticsUpdate statistics)
@@ -134,97 +133,74 @@ namespace osu.Game.Skinning.Select
         private void updateDisplay()
         {
             var statistics = userStatisticsProvider.GetStatisticsFor(ruleset.Value);
-            var user = statistics?.User ?? localUser.Value;
 
-            if (user == null || user.Id <= 1)
-            {
-                currentUser = null;
-
-                usernameText.Text = string.Empty;
-                infoText.Clear();
-
-                rankText.Text = string.Empty;
-                rankText.Hide();
-
-                rulesetIcon.Alpha = 70 / 255f;
-                rulesetIcon.Texture = skins.DefaultClassicSkin.GetTexture($"mode-{ruleset.Value.ShortName}-small");
-                rulesetIcon.Show();
-
-                levelBar.Hide();
-                avatar.User = null;
-
-                return;
-            }
-
-            currentUser = user;
+            currentUser = statistics?.User ?? api.LocalUser.Value;
 
             if (statistics == null)
             {
-                usernameText.Text = user.Username ?? string.Empty;
-
-                infoText.Clear();
-                infoText.AddText("Performance:-");
-                infoText.NewLine();
-                infoText.AddText("Accuracy:-");
-                infoText.NewLine();
-                infoText.AddText("Lv-");
-
+                usernameText.Text = currentUser?.Username ?? string.Empty;
+                infoText.Text = string.Empty;
                 rankText.Text = string.Empty;
                 rankText.Hide();
-
-                rulesetIcon.Alpha = 70 / 255f;
-                rulesetIcon.Texture = skins.DefaultClassicSkin.GetTexture($"mode-{ruleset.Value.ShortName}-small");
-                rulesetIcon.Show();
-
+                rulesetIcon.Hide();
                 levelBar.Hide();
-                avatar.User = user;
+
+                if (currentUser != null)
+                    avatar.User = currentUser;
 
                 return;
             }
 
+            // Username/avatar fallback only.
+            // Stats below are still EXACTLY from LocalUserStatisticsProvider.
+            usernameText.Text = currentUser?.Username ?? string.Empty;
+
+            if (currentUser != null)
+                avatar.User = currentUser;
+
+            infoText.Clear();
+            infoText.AddText($"Performance:{statistics.PP:N0}pp");
+            infoText.NewLine();
+            infoText.AddText($"Accuracy:{statistics.DisplayAccuracy}");
+            infoText.NewLine();
+            infoText.AddText($"Lv{statistics.Level.Current}");
+
+            if (!statistics.GlobalRank.HasValue)
             {
-                usernameText.Text = user.Username ?? string.Empty;
-                infoText.Clear();
-                infoText.AddText($"Performance:{statistics.PP:N0}pp");
-                infoText.NewLine();
-                infoText.AddText($"Accuracy:{statistics.DisplayAccuracy}");
-                infoText.NewLine();
-                infoText.AddText($"Lv{statistics.Level.Current}");
+                rankText.Text = string.Empty;
+                rankText.Hide();
+            }
+            else
+            {
+                int rank = statistics.GlobalRank.Value;
 
-                if (!statistics.GlobalRank.HasValue)
-                    rankText.Hide();
+                rankText.Text = $"#{rank}";
+                rankText.Show();
+
+                if (rank > 100000)
+                    rankText.Colour = new Color4(255, 255, 255, 40);
+                else if (rank > 50000)
+                    rankText.Colour = new Color4(255, 255, 255, 60);
+                else if (rank > 1000)
+                    rankText.Colour = new Color4(255, 255, 255, 80);
+                else if (rank > 10)
+                    rankText.Colour = new Color4(255, 255, 255, 100);
+                else if (rank > 1)
+                    rankText.Colour = new Color4(244, 218, 73, 120);
                 else
-                {
-                    int rank = statistics.GlobalRank.Value;
+                    rankText.Colour = new Color4(88, 171, 248, 120);
+            }
 
-                    rankText.Text = $"#{rank}";
+            rulesetIcon.Alpha = 70 / 255f;
+            rulesetIcon.Texture = skins.DefaultClassicSkin.GetTexture($"mode-{ruleset.Value.ShortName}-small");
+            rulesetIcon.Show();
 
-                    if (rank > 100000)
-                        rankText.Colour = new Color4(255, 255, 255, 40);
-                    else if (rank > 50000)
-                        rankText.Colour = new Color4(255, 255, 255, 60);
-                    else if (rank > 1000)
-                        rankText.Colour = new Color4(255, 255, 255, 80);
-                    else if (rank > 10)
-                        rankText.Colour = new Color4(255, 255, 255, 100);
-                    else if (rank > 1)
-                        rankText.Colour = new Color4(244, 218, 73, 120);
-                    else
-                        rankText.Colour = new Color4(88, 171, 248, 120);
-                }
-
-                rulesetIcon.Alpha = 70 / 255f;
-                rulesetIcon.Texture = skins.DefaultClassicSkin.GetTexture($"mode-{ruleset.Value.ShortName}-small");
-
-                if (statistics.Level.Progress == 0)
-                    levelBar.Hide();
-                else
-                {
-                    levelBar.Width = 198 * statistics.Level.Progress / 100f;
-                    levelBar.Show();
-                }
-
-                avatar.User = user;
+            if (statistics.Level.Progress == 0)
+                levelBar.Hide();
+            else
+            {
+                levelBar.Width = 198 * statistics.Level.Progress / 100f;
+                levelBar.Show();
             }
         }
 

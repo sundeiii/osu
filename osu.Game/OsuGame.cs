@@ -124,6 +124,16 @@ namespace osu.Game
 
         public Toolbar Toolbar { get; private set; }
 
+        private Bindable<bool> autoHideToolbar;
+        private double? toolbarAutoHideTime;
+        private InputManager autoHideInputManager;
+
+        private const float toolbar_reveal_edge = 5;
+        private const double toolbar_auto_hide_delay = 1500;
+
+        private Bindable<int> toolbarToggleHintWatcher;
+        private Bindable<bool> legacyStableDisclaimerWatcher;
+
         private ChatOverlay chatOverlay;
 
         private ChannelManager channelManager;
@@ -1893,7 +1903,7 @@ namespace osu.Game
         {
             base.UpdateAfterChildren();
 
-            ScreenOffsetContainer.Padding = new MarginPadding { Top = toolbarOffset };
+            ScreenOffsetContainer.Padding = new MarginPadding { Top = autoHideToolbar?.Value == true ? 0 : toolbarOffset };
             overlayOffsetContainer.Padding = new MarginPadding { Top = toolbarOffset };
 
             float horizontalOffset = 0f;
@@ -1910,6 +1920,66 @@ namespace osu.Game
             overlayContent.X = horizontalOffset * 1.2f;
 
             GlobalCursorDisplay.ShowCursor = (ScreenStack.CurrentScreen as IOsuScreen)?.CursorVisible ?? false;
+            updateAutoHideToolbar();
+        }
+
+        private void updateAutoHideToolbar()
+        {
+            if (autoHideToolbar == null)
+            {
+                autoHideToolbar = LocalConfig.GetBindable<bool>(OsuSetting.ToriiAutoHideToolbar);
+                autoHideToolbar.BindValueChanged(e =>
+                {
+                    Toolbar.AutoHideActive = e.NewValue;
+
+                    if (!e.NewValue)
+                    {
+                        toolbarAutoHideTime = null;
+                        Toolbar.Show();
+                    }
+                }, true);
+
+                toolbarToggleHintWatcher = LocalConfig.GetBindable<int>(OsuSetting.ToriiToolbarToggleCount);
+                toolbarToggleHintWatcher.BindValueChanged(e =>
+                {
+                    if (e.NewValue >= 30)
+                        ShowAutoHideHint(false);
+                });
+
+                legacyStableDisclaimerWatcher = LocalConfig.GetBindable<bool>(OsuSetting.ToriiLegacySongSelectFooter);
+                legacyStableDisclaimerWatcher.BindValueChanged(e =>
+                {
+                    if (e.NewValue)
+                        ShowAutoHideHint(true);
+                });
+            }
+
+            if (!autoHideToolbar.Value)
+                return;
+
+            autoHideInputManager ??= GetContainingInputManager();
+            float mouseY = autoHideInputManager?.CurrentState.Mouse.Position.Y ?? float.MaxValue;
+
+            if (mouseY <= toolbar_reveal_edge)
+            {
+                toolbarAutoHideTime = null;
+                Toolbar.Show();
+            }
+            else if (Toolbar.State.Value == Visibility.Visible)
+            {
+                if (mouseY <= Toolbar.HEIGHT || Toolbar.IsHovered)
+                    toolbarAutoHideTime = null;
+                else
+                {
+                    toolbarAutoHideTime ??= Time.Current + toolbar_auto_hide_delay;
+
+                    if (Time.Current >= toolbarAutoHideTime)
+                    {
+                        toolbarAutoHideTime = null;
+                        Toolbar.Hide();
+                    }
+                }
+            }
         }
 
         protected virtual void ScreenChanged([CanBeNull] IOsuScreen current, [CanBeNull] IOsuScreen newScreen)
@@ -1989,6 +2059,57 @@ namespace osu.Game
             if (newScreen == null)
                 Exit();
         }
+
+        public void ShowAutoHideHint()
+        {
+            ShowAutoHideHint(false);
+        }
+
+        public void ShowAutoHideHint(bool stableContext)
+        {
+            if (OverlayActivationMode.Value == OverlayActivation.Disabled)
+                return;
+
+            if (LocalConfig.Get<bool>(OsuSetting.ToriiToolbarHintShown))
+                return;
+
+            if (LocalConfig.Get<bool>(OsuSetting.ToriiAutoHideToolbar))
+                return;
+
+            LocalConfig.SetValue(OsuSetting.ToriiToolbarHintShown, true);
+
+            string body = stableContext
+                ? "For the best experience with classic song select, enable auto-hide toolbar. It slides back when you move the cursor to the top of the screen, or you can hide it with Ctrl+T."
+                : "You use the toolbar a lot. Auto-hide can tuck it away and slide it back when you move the cursor to the top of the screen.";
+
+            waitForReady(() => Notifications, notifications => notifications.Post(new SimpleNotification
+            {
+                Text = body,
+                Icon = FontAwesome.Solid.InfoCircle,
+            }));
+        }
+
+        public void ShowStableSongSelectPromo()
+        {
+            if (OverlayActivationMode.Value == OverlayActivation.Disabled)
+                return;
+
+            if (LocalConfig.Get<bool>(OsuSetting.ToriiStablePromoShown))
+                return;
+
+            // If classic song select is already enabled, don't offer it.
+            if (LocalConfig.Get<bool>(OsuSetting.ToriiLegacySongSelectFooter))
+                return;
+
+            LocalConfig.SetValue(OsuSetting.ToriiStablePromoShown, true);
+
+            waitForReady(() => Notifications, notifications => notifications.Post(new SimpleNotification
+            {
+                Text = "We brought back a classic stable-style song select. Want to try it? You can turn it on in Settings → Interface.",
+                Icon = FontAwesome.Solid.InfoCircle,
+            }));
+        }
+        
         private partial class RestrictedAccountDialog : PopupDialog
         {
             private readonly APIUser user;

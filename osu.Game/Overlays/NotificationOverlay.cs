@@ -17,6 +17,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Overlays.Notifications;
@@ -32,6 +33,8 @@ namespace osu.Game.Overlays
         public IconUsage Icon => OsuIcon.Notification;
         public LocalisableString Title => NotificationsStrings.HeaderTitle;
         public LocalisableString Description => NotificationsStrings.HeaderDescription;
+        private IDisposable? customUiHueBinding;
+        private Box backgroundBox = null!;
 
         protected override double PopInOutSampleBalance => OsuGameBase.SFX_STEREO_STRENGTH;
 
@@ -70,9 +73,22 @@ namespace osu.Game.Overlays
 
         private Container mainContent = null!;
 
-        [BackgroundDependencyLoader]
-        private void load()
+        private void updateColours()
         {
+            backgroundBox.Colour = colourProvider.Background4;
+        }
+        [BackgroundDependencyLoader]
+        private void load(OsuConfigManager config)
+        {
+            customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                config,
+                colourProvider,
+                colourProvider.Hue,
+                CustomUiHueScope.Overlays,
+                null
+            );
+
+            colourProvider.ColoursChanged += updateColours;
             X = WIDTH;
             Width = WIDTH;
             RelativeSizeAxes = Axes.Y;
@@ -97,10 +113,9 @@ namespace osu.Game.Overlays
                     },
                     Children = new Drawable[]
                     {
-                        new Box
+                        backgroundBox = new Box
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Colour = colourProvider.Background4,
                         },
                         new OsuScrollContainer
                         {
@@ -125,6 +140,7 @@ namespace osu.Game.Overlays
                     }
                 },
             };
+            updateColours();
         }
 
         private ScheduledDelegate? notificationsEnabler;
@@ -278,6 +294,13 @@ namespace osu.Game.Overlays
         private void updateCounts()
         {
             unreadCount.Value = sections.Select(c => c.UnreadCount).Sum() + toastTray.UnreadCount;
+        }
+        protected override void Dispose(bool isDisposing)
+        {
+            customUiHueBinding?.Dispose();
+            colourProvider.ColoursChanged -= updateColours;
+
+            base.Dispose(isDisposing);
         }
     }
 }

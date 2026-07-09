@@ -48,6 +48,9 @@ namespace osu.Game.Screens.Select
         /// </summary>
         public FilterControl FilterControl { get; init; } = null!;
 
+        public Action? SelectPreviousAction { get; init; }
+        public Action? SelectNextAction { get; init; }
+
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
 
@@ -105,8 +108,7 @@ namespace osu.Game.Screens.Select
                 {
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
-                    // va adelante asi el menu abierto queda por encima de los tabs + el search de abajo.
-                    Depth = -1,
+                    Depth = -10,
                     Position = new Vector2(-284, 28),
                     AccentColour = group_colour,
                     Width = dropdown_width,
@@ -114,12 +116,12 @@ namespace osu.Game.Screens.Select
                     Current = { BindTarget = groupBindable },
                 },
                 // label Sort + dropdown (stable: x = WidthScaled-130).
-                label(@"Sort", sort_colour, x: -212),
+                label(@"Sort", sort_colour, x: 212),
                 sortDropdown = new LegacyStableDropdown<SortMode>
                 {
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
-                    Depth = -1,
+                    Depth = -10,
                     Position = new Vector2(-15, 28),
                     AccentColour = sort_colour,
                     Width = dropdown_width,
@@ -144,6 +146,11 @@ namespace osu.Game.Screens.Select
                     Origin = Anchor.TopRight,
                     Margin = new MarginPadding { Top = 82, Right = 14 },
                     Current = { BindTarget = FilterControl.SearchQuery },
+
+                    // Needed because the search box holds focus.
+                    // Left/right are otherwise consumed as text-caret movement.
+                    SelectPreviousAction = SelectPreviousAction,
+                    SelectNextAction = SelectNextAction,
                 },
             };
 

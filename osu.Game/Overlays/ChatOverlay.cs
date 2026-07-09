@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
@@ -35,7 +36,8 @@ namespace osu.Game.Overlays
         public IconUsage Icon => OsuIcon.Chat;
         public LocalisableString Title => ChatStrings.HeaderTitle;
         public LocalisableString Description => ChatStrings.HeaderDescription;
-
+        private IDisposable? customUiHueBinding;
+        private Box backgroundBox = null!;
         private ChatOverlayTopBar topBar = null!;
         private ChannelList channelList = null!;
         private LoadingLayer loading = null!;
@@ -93,10 +95,23 @@ namespace osu.Game.Overlays
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
         }
+        private void updateColours()
+        {
+            backgroundBox.Colour = colourProvider.Background4;
+        }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuConfigManager config)
         {
+            customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                config,
+                colourProvider,
+                colourProvider.Hue,
+                CustomUiHueScope.Overlays,
+                null
+            );
+
+            colourProvider.ColoursChanged += updateColours;
             // Required for the pop in/out animation
             RelativePositionAxes = Axes.Both;
 
@@ -113,10 +128,9 @@ namespace osu.Game.Overlays
                     Padding = new MarginPadding { Top = top_bar_height },
                     Children = new Drawable[]
                     {
-                        new Box
+                        backgroundBox = new Box
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Colour = colourProvider.Background4,
                         },
                         new OnlineViewContainer("Sign in to chat")
                         {
@@ -171,6 +185,7 @@ namespace osu.Game.Overlays
                     }
                 }
             };
+            updateColours();
         }
 
         protected override void LoadComplete()
@@ -446,6 +461,13 @@ namespace osu.Game.Overlays
                 default:
                     return true;
             }
+        }
+        protected override void Dispose(bool isDisposing)
+        {
+            customUiHueBinding?.Dispose();
+            colourProvider.ColoursChanged -= updateColours;
+
+            base.Dispose(isDisposing);
         }
     }
 }

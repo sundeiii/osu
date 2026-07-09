@@ -35,6 +35,9 @@ namespace osu.Game.Overlays.Profile.Header
         [Resolved]
         private RankingsOverlay? rankingsOverlay { get; set; }
 
+        private OverlayColourProvider colourProvider = null!;
+
+        private Box background = null!;
         private UserCoverBackground cover = null!;
         private SupporterIcon supporterTag = null!;
         private UpdateableAvatar avatar = null!;
@@ -58,6 +61,9 @@ namespace osu.Game.Overlays.Profile.Header
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider, OsuConfigManager configManager)
         {
+            this.colourProvider = colourProvider;
+            colourProvider.ColoursChanged += updateColours;
+
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
 
@@ -65,10 +71,9 @@ namespace osu.Game.Overlays.Profile.Header
 
             InternalChildren = new Drawable[]
             {
-                new Box
+                background = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background3,
                 },
                 new FillFlowContainer
                 {
@@ -149,7 +154,6 @@ namespace osu.Game.Overlays.Profile.Header
                                                         },
                                                         new Container
                                                         {
-                                                            // Intentionally use a zero-size container, else the fill flow will adjust to (and cancel) the upwards animation.
                                                             Child = PreviousUsernamesDisplay,
                                                         }
                                                     }
@@ -227,6 +231,13 @@ namespace osu.Game.Overlays.Profile.Header
                     },
                 },
             };
+
+            updateColours();
+        }
+
+        private void updateColours()
+        {
+            background.Colour = colourProvider.Background3;
         }
 
         protected override void LoadComplete()
@@ -266,8 +277,6 @@ namespace osu.Game.Overlays.Profile.Header
 
             cover.ResizeHeightTo(expanded ? 250 : 0, transition_duration, Easing.OutQuint);
 
-            // Without this a very tiny slither of the cover will be visible even with a size of zero.
-            // Integer masking woes, no doubt.
             if (expanded)
                 cover.FadeIn(transition_duration, Easing.OutQuint);
             else
@@ -276,6 +285,14 @@ namespace osu.Game.Overlays.Profile.Header
             avatar.ResizeTo(new Vector2(expanded ? 120 : content_height), transition_duration, Easing.OutQuint);
             avatar.TransformTo(nameof(avatar.CornerRadius), expanded ? 40f : 20f, transition_duration, Easing.OutQuint);
             flow.TransformTo(nameof(flow.Spacing), new Vector2(expanded ? 20f : 10f), transition_duration, Easing.OutQuint);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (colourProvider != null)
+                colourProvider.ColoursChanged -= updateColours;
         }
 
         private partial class ProfileCoverBackground : UserCoverBackground

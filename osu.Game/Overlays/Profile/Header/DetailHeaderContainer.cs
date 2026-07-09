@@ -15,20 +15,25 @@ namespace osu.Game.Overlays.Profile.Header
     {
         public readonly Bindable<UserProfileData?> User = new Bindable<UserProfileData?>();
 
+        private OverlayColourProvider colourProvider = null!;
+
+        private Box background = null!;
         private Box extendedDetailsSeparator = null!;
         private ExtendedDetails extendedDetails = null!;
 
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider)
         {
+            this.colourProvider = colourProvider;
+            colourProvider.ColoursChanged += updateColours;
+
             AutoSizeAxes = Axes.Y;
 
             InternalChildren = new Drawable[]
             {
-                new Box
+                background = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background5,
                 },
                 new GridContainer
                 {
@@ -58,7 +63,6 @@ namespace osu.Game.Overlays.Profile.Header
                             {
                                 RelativeSizeAxes = Axes.Y,
                                 Width = 2,
-                                Colour = colourProvider.Background6,
                                 Margin = new MarginPadding { Horizontal = 15 }
                             },
                             extendedDetails = new ExtendedDetails
@@ -71,6 +75,14 @@ namespace osu.Game.Overlays.Profile.Header
                     }
                 }
             };
+
+            updateColours();
+        }
+
+        private void updateColours()
+        {
+            background.Colour = colourProvider.Background5;
+            extendedDetailsSeparator.Colour = colourProvider.Background6;
         }
 
         protected override void LoadComplete()
@@ -86,6 +98,14 @@ namespace osu.Game.Overlays.Profile.Header
 
             extendedDetailsSeparator.FadeTo(restricted ? 0 : 1, 180, Easing.OutQuint);
             extendedDetails.FadeTo(restricted ? 0 : 1, 180, Easing.OutQuint);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (colourProvider != null)
+                colourProvider.ColoursChanged -= updateColours;
         }
     }
 }

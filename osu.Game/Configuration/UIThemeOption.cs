@@ -35,7 +35,7 @@ namespace osu.Game.Configuration
         /// Default Torii palette: full-saturation accents (pink, blue,
         /// yellow, etc.) on the standard dark backgrounds.
         /// </summary>
-        [Description("Torii")]
+        [Description("Default")]
         Torii,
 
         /// <summary>

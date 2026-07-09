@@ -40,6 +40,22 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Caption = GameplaySettingsStrings.StarFountains,
                     Current = config.GetBindable<bool>(OsuSetting.StarFountains)
                 }),
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Skip breaks",
+                    Current = config.GetBindable<bool>(OsuSetting.ToriiSkipBreaksEnabled)
+                })
+                {
+                    Keywords = new[] { "break", "skip", "stable", "torii" },
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Single confirmation for break skip",
+                    Current = config.GetBindable<bool>(OsuSetting.ToriiSkipBreaksSingleConfirmation)
+                })
+                {
+                    Keywords = new[] { "break", "skip", "confirm", "confirmation" },
+                },
             };
         }
     }

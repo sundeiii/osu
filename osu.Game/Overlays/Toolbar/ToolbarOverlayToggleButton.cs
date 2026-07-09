@@ -3,12 +3,14 @@
 
 #nullable disable
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 
 namespace osu.Game.Overlays.Toolbar
@@ -20,6 +22,9 @@ namespace osu.Game.Overlays.Toolbar
         private OverlayContainer stateContainer;
 
         private readonly Bindable<Visibility> overlayState = new Bindable<Visibility>();
+
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Pink);
+        private IDisposable customUiHueBinding;
 
         public OverlayContainer StateContainer
         {
@@ -46,18 +51,32 @@ namespace osu.Game.Overlays.Toolbar
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuColour colours)
+        private void load(OsuConfigManager config)
         {
+            customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                config,
+                colourProvider,
+                OverlayColourScheme.Pink.GetHue(),
+                CustomUiHueScope.Menu);
+
+            colourProvider.ColoursChanged += updateColours;
+
             BackgroundContent.Add(stateBackground = new Box
             {
                 RelativeSizeAxes = Axes.Both,
-                Colour = colours.Carmine.Opacity(180),
                 Blending = BlendingParameters.Additive,
                 Depth = float.MaxValue,
                 Alpha = 0,
             });
 
+            updateColours();
+
             overlayState.ValueChanged += stateChanged;
+        }
+
+        private void updateColours()
+        {
+            stateBackground.Colour = colourProvider.Highlight1.Opacity(0.45f);
         }
 
         private void stateChanged(ValueChangedEvent<Visibility> state)
@@ -72,6 +91,14 @@ namespace osu.Game.Overlays.Toolbar
                     stateBackground.FadeIn(200, Easing.OutQuint);
                     break;
             }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            colourProvider.ColoursChanged -= updateColours;
+            customUiHueBinding?.Dispose();
         }
     }
 }

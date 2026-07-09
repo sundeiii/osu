@@ -16,8 +16,12 @@ namespace osu.Game.Overlays.Profile.Header
     {
         public readonly Bindable<UserProfileData?> User = new Bindable<UserProfileData?>();
 
+        private OverlayColourProvider colourProvider = null!;
+
+        private Box background = null!;
         private LevelBadge levelBadge = null!;
         private Container levelContainer = null!;
+
         public CentreHeaderContainer()
         {
             Height = 60;
@@ -26,12 +30,14 @@ namespace osu.Game.Overlays.Profile.Header
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider)
         {
+            this.colourProvider = colourProvider;
+            colourProvider.ColoursChanged += updateColours;
+
             InternalChildren = new Drawable[]
             {
-                new Box
+                background = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background3
                 },
                 new FillFlowContainer
                 {
@@ -91,6 +97,13 @@ namespace osu.Game.Overlays.Profile.Header
                     }
                 }
             };
+
+            updateColours();
+        }
+
+        private void updateColours()
+        {
+            background.Colour = colourProvider.Background3;
         }
 
         protected override void LoadComplete()
@@ -106,6 +119,14 @@ namespace osu.Game.Overlays.Profile.Header
 
             levelBadge.LevelInfo.Value = restricted ? null : user?.Statistics?.Level;
             levelContainer.Alpha = restricted ? 0 : 1;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (colourProvider != null)
+                colourProvider.ColoursChanged -= updateColours;
         }
     }
 }

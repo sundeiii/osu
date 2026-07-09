@@ -26,8 +26,10 @@ namespace osu.Game.Online.API.Requests
         private readonly BeatmapLeaderboardScope scope;
         private readonly IRulesetInfo ruleset;
         private readonly IEnumerable<IMod> mods;
+        
+        private readonly string? countryCode;
 
-        public GetScoresRequest(IBeatmapInfo beatmapInfo, IRulesetInfo ruleset, BeatmapLeaderboardScope scope = BeatmapLeaderboardScope.Global, IEnumerable<IMod>? mods = null)
+        public GetScoresRequest(IBeatmapInfo beatmapInfo, IRulesetInfo ruleset, BeatmapLeaderboardScope scope = BeatmapLeaderboardScope.Global, IEnumerable<IMod>? mods = null, string? countryCode = null)
         {
             if (beatmapInfo.OnlineID <= 0)
                 throw new InvalidOperationException($"Cannot lookup a beatmap's scores without having a populated {nameof(IBeatmapInfo.OnlineID)}.");
@@ -39,6 +41,7 @@ namespace osu.Game.Online.API.Requests
             this.scope = scope;
             this.ruleset = ruleset ?? throw new ArgumentNullException(nameof(ruleset));
             this.mods = mods ?? Array.Empty<IMod>();
+            this.countryCode = countryCode;
 
             ScoresRequested = this.scope.RequiresSupporter(this.mods.Any()) ? MAX_SCORES_PER_REQUEST : DEFAULT_SCORES_PER_REQUEST;
         }
@@ -51,6 +54,8 @@ namespace osu.Game.Online.API.Requests
 
             req.AddParameter(@"type", scope.ToString().ToLowerInvariant());
             req.AddParameter(@"mode", ruleset.ShortName);
+            if (!string.IsNullOrEmpty(countryCode))
+                req.AddParameter(@"country", countryCode);
 
             foreach (var mod in mods)
                 req.AddParameter(@"mods[]", mod.Acronym);
@@ -65,9 +70,10 @@ namespace osu.Game.Online.API.Requests
             if (ReferenceEquals(this, other)) return true;
 
             return beatmapInfo.Equals(other.beatmapInfo)
-                   && scope == other.scope
-                   && ruleset.Equals(other.ruleset)
-                   && mods.SequenceEqual(other.mods);
+                && scope == other.scope
+                && ruleset.Equals(other.ruleset)
+                && string.Equals(countryCode, other.countryCode, StringComparison.OrdinalIgnoreCase)
+                && mods.SequenceEqual(other.mods);
         }
     }
 }

@@ -229,17 +229,66 @@ namespace osu.Game.Online.Chat
                 // if this is a PM and the first message, we need to do a special request to create the PM channel
                 if (target.Type == ChannelType.PM && target.Id == 0)
                 {
-                    var createNewPrivateMessageRequest = new CreateNewPrivateMessageRequest(target.Users.First(), message);
+                    var recipient = target.Users.FirstOrDefault();
 
-                    createNewPrivateMessageRequest.Success += _ => dequeueAndRun();
-                    createNewPrivateMessageRequest.Failure += exception =>
+                    void sendPrivateMessage(APIUser user)
                     {
-                        handlePostException(exception);
-                        target.ReplaceMessage(message, null);
-                        dequeueAndRun();
-                    };
+                        if (!target.Users.Any(u => u.Id == user.Id))
+                            target.Users.Add(user);
 
-                    api.Queue(createNewPrivateMessageRequest);
+                        var createNewPrivateMessageRequest = new CreateNewPrivateMessageRequest(user, message);
+
+                        createNewPrivateMessageRequest.Success += _ => dequeueAndRun();
+                        createNewPrivateMessageRequest.Failure += exception =>
+                        {
+                            handlePostException(exception);
+                            target.ReplaceMessage(message, null);
+                            dequeueAndRun();
+                        };
+
+                        api.Queue(createNewPrivateMessageRequest);
+                    }
+
+                    if (recipient == null)
+                    {
+                        // g0v0/stable PM interop can create a PM tab with a name but no Users entry.
+                        // Resolve the recipient from the PM channel name before giving up.
+                        if (!string.IsNullOrWhiteSpace(target.Name))
+                        {
+                            var getUserRequest = new GetUserRequest(target.Name);
+
+                            getUserRequest.Success += user =>
+                            {
+                                if (user.Id == api.LocalUser.Value.Id)
+                                {
+                                    target.ReplaceMessage(message, null);
+                                    target.AddNewMessages(new ErrorMessage("Cannot send message: private channel recipient resolved to yourself."));
+                                    dequeueAndRun();
+                                    return;
+                                }
+
+                                sendPrivateMessage(user);
+                            };
+
+                            getUserRequest.Failure += exception =>
+                            {
+                                handlePostException(exception);
+                                target.ReplaceMessage(message, null);
+                                target.AddNewMessages(new ErrorMessage("Cannot send message: private channel has no recipient."));
+                                dequeueAndRun();
+                            };
+
+                            api.Queue(getUserRequest);
+                            return;
+                        }
+
+                        target.ReplaceMessage(message, null);
+                        target.AddNewMessages(new ErrorMessage("Cannot send message: private channel has no recipient."));
+                        dequeueAndRun();
+                        return;
+                    }
+
+                    sendPrivateMessage(recipient);
                     return;
                 }
 

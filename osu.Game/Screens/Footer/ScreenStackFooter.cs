@@ -100,7 +100,7 @@ namespace osu.Game.Screens.Footer
 
             // Rebuild the legacy footer when the "skin the footer" toggle changes so it
             // applies live (it reads the setting once at construction).
-            footerUseSkin = config.GetBindable<bool>(OsuSetting.ToriiLegacyFooterUseSkin);
+            footerUseSkin = config.GetBindable<bool>(OsuSetting.ToriiLegacySongSelectFooter);
             footerUseSkin.BindValueChanged(_ => onSkinChanged());
 
             // The standalone "Legacy footer" toggle only flips whether the footer is mounted, so a plain

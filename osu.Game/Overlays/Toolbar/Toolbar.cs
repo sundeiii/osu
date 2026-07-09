@@ -14,10 +14,12 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Input.Events;
-using osu.Game.Rulesets;
 using osu.Framework.Input.Bindings;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
+using osu.Game.Rulesets;
+
 
 namespace osu.Game.Overlays.Toolbar
 {
@@ -31,6 +33,9 @@ namespace osu.Game.Overlays.Toolbar
         /// In this state, automatic toggles should not occur, respecting the user's preference to have no toolbar.
         /// </summary>
         private bool hiddenByUser;
+        public bool AutoHideActive { get; set; }
+        private IBindable<bool> autoHideToolbar = null!;
+        private Bindable<int> toolbarToggleCount = null!;
 
         public Action OnHome;
 
@@ -63,10 +68,12 @@ namespace osu.Game.Overlays.Toolbar
         private Bindable<RulesetInfo> ruleset { get; set; }
 
         [BackgroundDependencyLoader(true)]
-        private void load(OsuGame osuGame)
+        private void load(OsuGame osuGame, OsuConfigManager config)
         {
             ToolbarBackground background;
             HoverInterceptor interceptor;
+            autoHideToolbar = config.GetBindable<bool>(OsuSetting.ToriiAutoHideToolbar);
+            toolbarToggleCount = config.GetBindable<int>(OsuSetting.ToriiToolbarToggleCount);
 
             Children = new Drawable[]
             {
@@ -205,45 +212,69 @@ namespace osu.Game.Overlays.Toolbar
 
         public partial class ToolbarBackground : Container
         {
-            public Bindable<bool> ShowGradient { get; } = new BindableBool();
+            public readonly BindableBool ShowGradient = new BindableBool();
 
+            private readonly Box background;
             private readonly Box gradientBackground;
+
+            private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Pink);
+            private IDisposable? customUiHueBinding;
 
             public ToolbarBackground()
             {
                 RelativeSizeAxes = Axes.Both;
+
                 Children = new Drawable[]
                 {
-                    new Box
+                    background = new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = OsuColour.Gray(0.1f),
                     },
                     gradientBackground = new Box
                     {
-                        RelativeSizeAxes = Axes.X,
-                        Anchor = Anchor.BottomLeft,
+                        RelativeSizeAxes = Axes.Both,
                         Alpha = 0,
-                        Height = 80,
-                        Colour = ColourInfo.GradientVertical(
-                            OsuColour.Gray(0f).Opacity(0.7f), OsuColour.Gray(0).Opacity(0)),
                     },
                 };
             }
 
-            protected override void LoadComplete()
+            [BackgroundDependencyLoader]
+            private void load(OsuConfigManager config)
             {
-                base.LoadComplete();
+                customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                    config,
+                    colourProvider,
+                    OverlayColourScheme.Pink.GetHue(),
+                    CustomUiHueScope.Menu);
 
-                ShowGradient.BindValueChanged(_ => updateState(), true);
+                colourProvider.ColoursChanged += updateColours;
+
+                updateColours();
+
+                ShowGradient.BindValueChanged(show =>
+                {
+                    if (show.NewValue)
+                        gradientBackground.FadeIn(2500, Easing.OutQuint);
+                    else
+                        gradientBackground.FadeOut(200, Easing.OutQuint);
+                }, true);
             }
 
-            private void updateState()
+            private void updateColours()
             {
-                if (ShowGradient.Value)
-                    gradientBackground.FadeIn(2500, Easing.OutQuint);
-                else
-                    gradientBackground.FadeOut(200, Easing.OutQuint);
+                background.Colour = colourProvider.Background6.Opacity(0.95f);
+
+                gradientBackground.Colour = ColourInfo.GradientVertical(
+                    colourProvider.Background5.Opacity(0.7f),
+                    colourProvider.Background6.Opacity(0f));
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                colourProvider.ColoursChanged -= updateColours;
+                customUiHueBinding?.Dispose();
             }
         }
 
@@ -273,7 +304,7 @@ namespace osu.Game.Overlays.Toolbar
 
         protected override void UpdateState(ValueChangedEvent<Visibility> state)
         {
-            bool blockShow = hiddenByUser || OverlayActivationMode.Value == OverlayActivation.Disabled;
+            bool blockShow = (!AutoHideActive && hiddenByUser) || OverlayActivationMode.Value == OverlayActivation.Disabled;
 
             if (state.NewValue == Visibility.Visible && blockShow)
             {
@@ -306,7 +337,8 @@ namespace osu.Game.Overlays.Toolbar
             switch (e.Action)
             {
                 case GlobalAction.ToggleToolbar:
-                    hiddenByUser = State.Value == Visibility.Visible; // set before toggling to allow the operation to always succeed.
+                    toolbarToggleCount.Value++;
+                    hiddenByUser = State.Value == Visibility.Visible;
                     ToggleVisibility();
                     return true;
             }

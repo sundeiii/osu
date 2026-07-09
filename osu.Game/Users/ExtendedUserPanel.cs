@@ -2,11 +2,13 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Users.Drawables;
@@ -14,6 +16,8 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Metadata;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Users
 {
@@ -21,8 +25,12 @@ namespace osu.Game.Users
     {
         protected TextFlowContainer LastVisitMessage { get; private set; } = null!;
 
+        private FillFlowContainer clientBadges = null!;
+        private string lastClientBadgeKey = string.Empty;
+
         private StatusIcon statusIcon = null!;
         private StatusText statusMessage = null!;
+        
 
         [Resolved]
         private MetadataClient? metadata { get; set; }
@@ -41,6 +49,21 @@ namespace osu.Game.Users
         private void load()
         {
             BorderColour = ColourProvider?.Light1 ?? Colours.GreyVioletLighter;
+
+            AddInternal(clientBadges = new FillFlowContainer
+            {
+                Anchor = Anchor.TopRight,
+                Origin = Anchor.TopRight,
+                AutoSizeAxes = Axes.Both,
+                Direction = FillDirection.Horizontal,
+                Spacing = new Vector2(5, 0),
+                Margin = new MarginPadding
+                {
+                    Top = 10,
+                    Right = 10
+                },
+                Depth = -10,
+            });
         }
 
         protected override void LoadComplete()
@@ -92,8 +115,13 @@ namespace osu.Game.Users
         {
             // TODO: we probably don't want to do this every frame.
             UserPresence? presence = metadata?.GetPresence(User.OnlineID);
-            UserStatus status = presence?.Status ?? UserStatus.Offline;
+
+            UserStatus status = presence?.Status
+                                ?? (User.WasRecentlyOnline ? UserStatus.Online : UserStatus.Offline);
+
             UserActivity? activity = presence?.Activity;
+
+            updateClientBadges(presence);
 
             if (status == lastStatus && activity == lastActivity)
                 return;
@@ -144,9 +172,101 @@ namespace osu.Game.Users
             base.OnHoverLost(e);
         }
 
+        private static string getClientDisplayName(string client) => client switch
+        {
+            "stable" => "Rinari Stable",
+            "lazer" => "Rinari Lazer",
+            "web" => "Rinari Web",
+            _ => client
+        };
+
+        private static string getClientShortName(string client) => client switch
+        {
+            "stable" => "stable",
+            "lazer" => "lazer",
+            "web" => "web",
+            _ => client
+        };
+
+        private static string getClientTooltip(string client) => client switch
+        {
+            "stable" => "Playing on Rinari Stable",
+            "lazer" => "Playing on Rinari Lazer",
+            "web" => "Browsing Rinari Web",
+            _ => $"Online via {client}"
+        };
+
+        private void updateClientBadges(UserPresence? presence)
+        {
+            string[] clients = presence != null
+                ? new[] { "lazer" }
+                : User.CurrentClients ?? Array.Empty<string>();
+
+            clients = clients.Distinct().ToArray();
+
+            string key = string.Join(",", clients);
+
+            if (key == lastClientBadgeKey)
+                return;
+
+            lastClientBadgeKey = key;
+
+            clientBadges.Clear();
+
+            foreach (string client in clients)
+                clientBadges.Add(new ClientBadge(client));
+        }
+
         private partial class StatusText : OsuSpriteText, IHasTooltip
         {
             public LocalisableString TooltipText { get; set; }
+        }
+
+        private partial class ClientBadge : CircularContainer, IHasTooltip
+        {
+            public LocalisableString TooltipText { get; }
+
+            public ClientBadge(string client)
+            {
+                TooltipText = getClientTooltip(client);
+
+                Size = new Vector2(getClientBadgeWidth(client), 24);
+                Masking = true;
+                CornerRadius = 7;
+
+                Children = new Drawable[]
+                {
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = client switch
+                        {
+                            "stable" => Colour4.FromHex("#c52f55"),
+                            "lazer" => Colour4.FromHex("#d9a21b"),
+                            "web" => Colour4.FromHex("#4f8cff"),
+                            _ => Colour4.FromHex("#555555")
+                        }
+                    },
+                    new OsuSpriteText
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Text = getClientShortName(client),
+                        Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
+                        Colour = Colour4.White,
+                    }
+                };
+            }
+
+            private static float getClientBadgeWidth(string client) => client switch
+            {
+                "stable" => 72,
+                "lazer" => 62,
+                "web" => 50,
+                _ => 70
+            };
+
+            protected override bool OnHover(osu.Framework.Input.Events.HoverEvent e) => true;
         }
     }
 }

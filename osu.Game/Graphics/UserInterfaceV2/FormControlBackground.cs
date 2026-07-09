@@ -34,6 +34,8 @@ namespace osu.Game.Graphics.UserInterfaceV2
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
 
+        private bool coloursBound;
+
         private readonly Box box;
         private readonly Box flashLayer;
 
@@ -64,6 +66,13 @@ namespace osu.Game.Graphics.UserInterfaceV2
                 },
                 sounds = new HoverSounds(),
             };
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            colourProvider.ColoursChanged += updateStyleInstant;
+            coloursBound = true;
         }
 
         protected override void LoadComplete()
@@ -102,23 +111,29 @@ namespace osu.Game.Graphics.UserInterfaceV2
             switch (visualStyle)
             {
                 case VisualStyle.Normal:
-                    colour = colourProvider.Background4.Darken(0.1f);
-                    borderColour = colourProvider.Light4;
+                    colour = colourProvider.Background4;
+                    borderColour = colourProvider.Highlight1.Opacity(0);
                     break;
 
                 case VisualStyle.Disabled:
-                    colour = colourProvider.Background4;
+                    colour = colourProvider.Background5;
                     borderColour = colourProvider.Dark1;
                     break;
 
                 case VisualStyle.Hovered:
-                    colour = ColourInfo.GradientVertical(colourProvider.Background5, colourProvider.Dark4);
-                    borderColour = colourProvider.Light4;
+                    colour = ColourInfo.GradientVertical(
+                        colourProvider.Background4,
+                        colourProvider.Background3
+                    );
+                    borderColour = colourProvider.Highlight1;
                     border = true;
                     break;
 
                 case VisualStyle.Focused:
-                    colour = ColourInfo.GradientVertical(colourProvider.Background5, colourProvider.Dark3);
+                    colour = ColourInfo.GradientVertical(
+                        colourProvider.Background4,
+                        colourProvider.Background3
+                    );
                     border = true;
                     borderColour = colourProvider.Highlight1;
                     break;
@@ -130,6 +145,20 @@ namespace osu.Game.Graphics.UserInterfaceV2
             this.TransformTo(nameof(BorderColour), border ? borderColour : colour, 250, Easing.OutQuint);
 
             box.FadeColour(colour, 250, Easing.OutQuint);
+        }
+        private void updateStyleInstant()
+        {
+            updateStyle();
+            FinishTransforms(true);
+            box.FinishTransforms(true);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (coloursBound)
+                colourProvider.ColoursChanged -= updateStyleInstant;
+
+            base.Dispose(isDisposing);
         }
     }
 

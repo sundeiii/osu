@@ -1,6 +1,8 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+#nullable disable
+
 using System;
 using System.Linq;
 using osu.Framework;
@@ -8,20 +10,24 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Game.Graphics.Sprites;
-using osuTK;
-using osuTK.Graphics;
-using osuTK.Input;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
-using osu.Game.Graphics.Containers;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Effects;
+using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Configuration;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Overlays;
+using osuTK;
+using osuTK.Graphics;
+using osuTK.Input;
 
 namespace osu.Game.Screens.Menu
 {
@@ -41,9 +47,6 @@ namespace osu.Game.Screens.Menu
         protected override Container<Drawable> Content => content;
         private readonly Container content;
 
-        /// <summary>
-        /// The menu state for which we are visible for (assuming only one).
-        /// </summary>
         public ButtonSystemState VisibleState
         {
             set
@@ -71,6 +74,15 @@ namespace osu.Game.Screens.Menu
         private readonly Box boxHoverLayer;
         private readonly SpriteIcon icon;
 
+        private Box backgroundBox;
+
+        private readonly Color4 originalAccentColour;
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Pink);
+        private IDisposable customUiHueBinding;
+
+        private IBindable<bool> customHueEnabled = null!;
+        private IBindable<bool> customHueApplyToMenu = null!;
+
         private Vector2 initialSize => BaseSize + Padding.Total;
 
         private readonly string sampleName;
@@ -78,9 +90,7 @@ namespace osu.Game.Screens.Menu
         private Sample? sampleHover;
         private SampleChannel? sampleChannel;
 
-        public override bool IsPresent => base.IsPresent
-                                          // Allow keyboard interaction based on state rather than waiting for delayed animations.
-                                          || state == ButtonState.Expanded;
+        public override bool IsPresent => base.IsPresent || state == ButtonState.Expanded;
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => background.ReceivePositionalInputAt(screenSpacePos);
 
@@ -89,6 +99,7 @@ namespace osu.Game.Screens.Menu
             this.sampleName = sampleName;
             this.clickAction = clickAction;
             TriggerKeys = triggerKeys;
+            originalAccentColour = colour;
 
             AutoSizeAxes = Axes.Both;
             Alpha = 0;
@@ -97,7 +108,6 @@ namespace osu.Game.Screens.Menu
             {
                 background = new Container
                 {
-                    // box needs to be always present to ensure the button is always sized correctly for flow
                     AlwaysPresent = true,
                     Masking = true,
                     MaskingSmoothness = 2,
@@ -166,7 +176,7 @@ namespace osu.Game.Screens.Menu
 
         protected virtual Drawable CreateBackground(Colour4 accentColour) => new Container
         {
-            Child = new Box
+            Child = backgroundBox = new Box
             {
                 EdgeSmoothness = new Vector2(1.5f, 0),
                 RelativeSizeAxes = Axes.Both,
@@ -174,17 +184,67 @@ namespace osu.Game.Screens.Menu
             }
         };
 
+        [BackgroundDependencyLoader]
+        private void load(AudioManager audio, OsuConfigManager config)
+        {
+            sampleHover = audio.Samples.Get(@"Menu/button-hover");
+            sampleClick = audio.Samples.Get(!string.IsNullOrEmpty(sampleName) ? $@"Menu/{sampleName}" : @"UI/button-select");
+
+            customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                config,
+                colourProvider,
+                OverlayColourScheme.Pink.GetHue(),
+                CustomUiHueScope.Menu);
+
+            customHueEnabled = config.GetBindable<bool>(OsuSetting.CustomUIHueEnabled);
+            customHueApplyToMenu = config.GetBindable<bool>(OsuSetting.CustomUIHueApplyToMenu);
+
+            customHueEnabled.BindValueChanged(_ => updateColours());
+            customHueApplyToMenu.BindValueChanged(_ => updateColours());
+
+            colourProvider.ColoursChanged += updateColours;
+
+            updateColours();
+        }
+
+        private void updateColours()
+        {
+            if (backgroundBox != null)
+                backgroundBox.Colour = getThemedAccentColour();
+        }
+
+        private Colour4 getThemedAccentColour()
+        {
+            if (!customHueEnabled.Value || !customHueApplyToMenu.Value)
+                return originalAccentColour;
+
+            // Original grey buttons: settings/back/etc.
+            if (Math.Abs(originalAccentColour.R - originalAccentColour.G) < 0.05f
+                && Math.Abs(originalAccentColour.G - originalAccentColour.B) < 0.05f)
+                return colourProvider.Background4;
+
+            // Original yellow/orange edit buttons.
+            if (originalAccentColour.R > 0.75f && originalAccentColour.G > 0.45f && originalAccentColour.B < 0.15f)
+                return colourProvider.Light1;
+
+            // Original green browse button.
+            if (originalAccentColour.G > 0.65f && originalAccentColour.B < 0.2f)
+                return colourProvider.Light2;
+
+            // Original pink/exit button.
+            if (originalAccentColour.R > 0.75f && originalAccentColour.B > 0.35f)
+                return colourProvider.Highlight1;
+
+            // Purple/play/multi/default buttons.
+            return colourProvider.Highlight1;
+        }
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
             background.Shear = new Vector2(ButtonSystem.WEDGE_WIDTH / initialSize.Y, 0);
 
-            // for whatever reason, attempting to size the background "just in time" to cover the visible width
-            // results in gaps when the width changes are quick (only visible when testing menu at 100% speed, not visible slowed down).
-            // to ensure there's no missing backdrop, just use a ballpark that should be enough to always cover the width and then some.
-            // note that while on a code inspections it would seem that `1.5 * initialSize.X` would be enough, elastic usings are used in this button
-            // (which can exceed the [0;1] range during interpolation).
             backgroundContent.Width = 2 * initialSize.X;
             backgroundContent.Shear = -background.Shear;
 
@@ -240,13 +300,6 @@ namespace osu.Game.Screens.Menu
 
             if (State == ButtonState.Expanded)
                 background.ResizeTo(initialSize, 500, Easing.OutElastic);
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(AudioManager audio)
-        {
-            sampleHover = audio.Samples.Get(@"Menu/button-hover");
-            sampleClick = audio.Samples.Get(!string.IsNullOrEmpty(sampleName) ? $@"Menu/{sampleName}" : @"UI/button-select");
         }
 
         protected override bool OnMouseDown(MouseDownEvent e)
@@ -398,6 +451,14 @@ namespace osu.Game.Screens.Menu
                         State = ButtonState.Exploded;
                     break;
             }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            colourProvider.ColoursChanged -= updateColours;
+            customUiHueBinding?.Dispose();
         }
     }
 

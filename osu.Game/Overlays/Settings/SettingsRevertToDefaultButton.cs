@@ -25,6 +25,8 @@ namespace osu.Game.Overlays.Settings
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
 
+        private bool coloursBound;
+
         // this is done to ensure a click on this button doesn't trigger focus on a parent element which contains the button.
         public override bool AcceptsFocus => true;
 
@@ -57,6 +59,11 @@ namespace osu.Game.Overlays.Settings
                     Size = new Vector2(IconSize),
                 }
             };
+
+            colourProvider.ColoursChanged += updateDisplay;
+            coloursBound = true;
+
+            updateDisplay();
         }
 
         protected override void LoadComplete()
@@ -93,6 +100,14 @@ namespace osu.Game.Overlays.Settings
         {
             spriteIcon.FadeColour(IsHovered ? colourProvider.Content2 : colourProvider.Light1, 300, Easing.OutQuint);
             background.FadeColour(IsHovered ? colourProvider.Background2 : colourProvider.Background3, 300, Easing.OutQuint);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (coloursBound)
+                colourProvider.ColoursChanged -= updateDisplay;
+
+            base.Dispose(isDisposing);
         }
     }
 }

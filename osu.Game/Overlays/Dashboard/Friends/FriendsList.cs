@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -69,9 +70,32 @@ namespace osu.Game.Overlays.Dashboard.Friends
             switch (e.Action)
             {
                 case NotifyDictionaryChangedAction.Add:
-                case NotifyDictionaryChangedAction.Remove:
+                    foreach ((int userId, _) in e.NewItems!)
+                        setUserOnlineState(userId, true);
+
                     updatePanelVisibilities();
                     break;
+
+                case NotifyDictionaryChangedAction.Remove:
+                    foreach ((int userId, _) in e.OldItems!)
+                        setUserOnlineState(userId, false);
+
+                    updatePanelVisibilities();
+                    break;
+            }
+        }
+
+        private void setUserOnlineState(int userId, bool online)
+        {
+            foreach (var panel in searchContainer)
+            {
+                if (panel.User.OnlineID != userId)
+                    continue;
+
+                
+
+                if (online)
+                    panel.User.LastVisit = DateTimeOffset.Now;
             }
         }
 
@@ -96,15 +120,17 @@ namespace osu.Game.Overlays.Dashboard.Friends
                         break;
 
                     case OnlineStatus.Online:
-                        panel.CanBeShown.Value = friendPresences.ContainsKey(panel.User.OnlineID);
+                        panel.CanBeShown.Value = isUserOnline(panel.User);
                         break;
 
                     case OnlineStatus.Offline:
-                        panel.CanBeShown.Value = !friendPresences.ContainsKey(panel.User.OnlineID);
+                        panel.CanBeShown.Value = !isUserOnline(panel.User);
                         break;
                 }
             }
         }
+        
+        private bool isUserOnline(APIUser user) => user.WasRecentlyOnline || friendPresences.ContainsKey(user.OnlineID);
 
         private FilterableUserPanel createUserPanel(APIUser user)
         {

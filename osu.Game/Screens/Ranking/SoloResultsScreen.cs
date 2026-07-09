@@ -10,6 +10,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
+using osu.Game.Online.API.Requests;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play.Leaderboards;
@@ -45,6 +46,52 @@ namespace osu.Game.Screens.Ranking
 
             if (requestTaskSource?.Task.IsCompleted == false)
                 requestTaskSource.SetCanceled();
+        }
+
+        private async Task<int?> fetchCountryRank()
+        {
+            Debug.Assert(Score != null);
+
+            var request = new GetScoresRequest(
+                Score.BeatmapInfo!,
+                Score.Ruleset,
+                BeatmapLeaderboardScope.Country,
+                leaderboardManager.CurrentCriteria?.ExactMods,
+                Score.User.CountryCode.ToString()
+            );
+
+            await api.PerformAsync(request).ConfigureAwait(false);
+
+            if (request.Response == null)
+                return null;
+
+            var userScore = request.Response.UserScore;
+
+            if (userScore?.Score != null)
+            {
+                if (userScore.Score.MatchesOnlineID(Score)
+                    || userScore.Score.User.OnlineID == Score.User.OnlineID
+                    && userScore.Score.TotalScore == Score.TotalScore
+                    && userScore.Score.MaxCombo == Score.MaxCombo)
+                {
+                    return userScore.Position;
+                }
+            }
+
+            for (int i = 0; i < request.Response.Scores.Count; i++)
+            {
+                var score = request.Response.Scores[i];
+
+                if (score.MatchesOnlineID(Score)
+                    || (score.User.OnlineID == Score.User.OnlineID
+                        && score.TotalScore == Score.TotalScore
+                        && score.MaxCombo == Score.MaxCombo))
+                {
+                    return i + 1;
+                }
+            }
+
+            return null;
         }
 
         protected override async Task<ScoreInfo[]> FetchScores()
@@ -156,6 +203,8 @@ namespace osu.Game.Screens.Ranking
             // so ensure that the drawable panel also receives the updated position.
             // note that this is valid to do precisely because we ensured `Score` was in `sortedScores` earlier.
             ScorePanelList.GetPanelForScore(Score).ScorePosition.Value = Score.Position;
+
+            StableCountryMapRank = await fetchCountryRank().ConfigureAwait(false);
 
             sortedScores.Remove(Score);
             return sortedScores.ToArray();

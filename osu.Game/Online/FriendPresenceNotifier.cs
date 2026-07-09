@@ -35,6 +35,11 @@ namespace osu.Game.Online
         /// </summary>
         public double OfflineDebounceTime { get; set; } = 15000;
 
+        private readonly HashSet<int> apiOnlineFriendIds = new HashSet<int>();
+
+        private double nextApiFriendRefreshTime;
+        private const double api_friend_refresh_interval = 15000;
+
         [Resolved]
         private INotificationOverlay notifications { get; set; } = null!;
 
@@ -87,6 +92,7 @@ namespace osu.Game.Online
             {
                 onlineAlertQueue.Clear();
                 offlineAlertQueue.Clear();
+                apiOnlineFriendIds.Clear();
 
                 nextOfflineAlertTime = null;
                 nextOnlineAlertTime = null;
@@ -102,6 +108,12 @@ namespace osu.Game.Online
         protected override void Update()
         {
             base.Update();
+
+            if (api.IsLoggedIn && Time.Current >= nextApiFriendRefreshTime)
+            {
+                api.LocalUserState.UpdateFriends();
+                nextApiFriendRefreshTime = Time.Current + api_friend_refresh_interval;
+            }
 
             if (notifyOnFriendPresenceChange.Value)
             {
@@ -120,6 +132,14 @@ namespace osu.Game.Online
                         if (friend.TargetUser is not APIUser user)
                             continue;
 
+                        if (user.WasRecentlyOnline)
+                        {
+                            if (apiOnlineFriendIds.Add(friend.TargetID))
+                                markUserOnline(user);
+
+                            continue;
+                        }
+
                         if (friendPresences.TryGetValue(friend.TargetID, out _))
                             markUserOnline(user);
                     }
@@ -134,12 +154,14 @@ namespace osu.Game.Online
 
                         onlineAlertQueue.Remove(user);
                         offlineAlertQueue.Remove(user);
+
+                        if (apiOnlineFriendIds.Remove(friend.TargetID) && !friendPresences.ContainsKey(friend.TargetID))
+                            markUserOfflineDebounced(user);
                     }
 
                     break;
             }
         }
-
         private void onFriendPresenceChanged(object? sender, NotifyDictionaryChangedEventArgs<int, UserPresence> e)
         {
             switch (e.Action)

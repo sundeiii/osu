@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -26,6 +27,9 @@ namespace osu.Game.Screens.Select
     public partial class LegacySearchBox : CompositeDrawable
     {
         public Bindable<string> Current { get; } = new Bindable<string>();
+
+        public Action? SelectPreviousAction { get; init; }
+        public Action? SelectNextAction { get; init; }
 
         [BackgroundDependencyLoader]
         private void load()
@@ -62,7 +66,7 @@ namespace osu.Game.Screens.Select
                                 Colour = Color4.GreenYellow,
                                 Shadow = true,
                             },
-                            new SearchTextBox
+                            new SearchTextBox(this)
                             {
                                 Anchor = Anchor.CentreLeft,
                                 Origin = Anchor.CentreLeft,
@@ -78,13 +82,13 @@ namespace osu.Game.Screens.Select
 
         private partial class SearchTextBox : FocusedTextBox
         {
-            public override bool HandleLeftRightArrows => false;
-            
-            public SearchTextBox()
+            private readonly LegacySearchBox owner;
+
+            public SearchTextBox(LegacySearchBox owner)
             {
+                this.owner = owner;
+
                 PlaceholderText = @"Type to search!";
-                // como en lazer: agarra y mantiene el foco asi se puede tipear directo sin clickear.
-                // solo esta presente en modo legacy, asi que no roba foco en el resto.
                 HoldFocus = true;
             }
 
@@ -97,12 +101,24 @@ namespace osu.Game.Screens.Select
 
             protected override bool OnKeyDown(KeyDownEvent e)
             {
-                // NO consumimos Enter: FocusedTextBox vendria a commitearlo y se lo comeria, y entonces
-                // GlobalAction.Select (empezar el mapa) nunca dispara. lo dejamos pasar, igual que
-                // FocusedTextBox ya hace con Escape para GlobalAction.Back. la busqueda filtra live por el
-                // binding two-way, asi que no necesitamos el commit.
-                if (e.Key == Key.Enter || e.Key == Key.KeypadEnter)
-                    return false;
+                switch (e.Key)
+                {
+                    case Key.Enter:
+                    case Key.KeypadEnter:
+                        return false;
+
+                    case Key.Left:
+                        owner.SelectPreviousAction?.Invoke();
+                        return true;
+
+                    case Key.Right:
+                        owner.SelectNextAction?.Invoke();
+                        return true;
+
+                    case Key.Up:
+                    case Key.Down:
+                        return false;
+                }
 
                 return base.OnKeyDown(e);
             }

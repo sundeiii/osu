@@ -6,10 +6,15 @@
 using System;
 using JetBrains.Annotations;
 using osu.Framework;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
+using osu.Game.Overlays;
 using osuTK;
 
 namespace osu.Game.Screens.Menu
@@ -35,7 +40,7 @@ namespace osu.Game.Screens.Menu
                 RelativeSizeAxes = Axes.X,
                 Size = new Vector2(1, BUTTON_AREA_HEIGHT),
                 Alpha = 0,
-                AlwaysPresent = true, // Always needs to be present for correct tracking on initial -> toplevel state change
+                AlwaysPresent = true,
                 Children = new Drawable[]
                 {
                     buttonAreaBackground = new ButtonAreaBackground(),
@@ -96,13 +101,46 @@ namespace osu.Game.Screens.Menu
         {
             private ButtonAreaBackgroundState state;
 
+            private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Pink);
+            private IDisposable customUiHueBinding;
+
+            private IBindable<bool> customHueEnabled = null!;
+            private IBindable<bool> customHueApplyToMenu = null!;
+
             public ButtonAreaBackground()
             {
                 RelativeSizeAxes = Axes.Both;
                 Size = new Vector2(2, 1);
-                Colour = OsuColour.Gray(50);
                 Anchor = Anchor.Centre;
                 Origin = Anchor.Centre;
+                Colour = OsuColour.Gray(50);
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OsuConfigManager config)
+            {
+                customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                    config,
+                    colourProvider,
+                    OverlayColourScheme.Pink.GetHue(),
+                    CustomUiHueScope.Menu);
+
+                customHueEnabled = config.GetBindable<bool>(OsuSetting.CustomUIHueEnabled);
+                customHueApplyToMenu = config.GetBindable<bool>(OsuSetting.CustomUIHueApplyToMenu);
+
+                customHueEnabled.BindValueChanged(_ => updateColours());
+                customHueApplyToMenu.BindValueChanged(_ => updateColours());
+
+                colourProvider.ColoursChanged += updateColours;
+
+                updateColours();
+            }
+
+            private void updateColours()
+            {
+                Colour = customHueEnabled.Value && customHueApplyToMenu.Value
+                    ? colourProvider.Background6.Opacity(0.85f)
+                    : OsuColour.Gray(50);
             }
 
             public ButtonAreaBackgroundState State
@@ -150,6 +188,14 @@ namespace osu.Game.Screens.Menu
 
             [CanBeNull]
             public event Action<ButtonAreaBackgroundState> StateChanged;
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                colourProvider.ColoursChanged -= updateColours;
+                customUiHueBinding?.Dispose();
+            }
         }
 
         public enum ButtonAreaBackgroundState

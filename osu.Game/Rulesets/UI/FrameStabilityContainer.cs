@@ -124,6 +124,13 @@ namespace osu.Game.Rulesets.UI
             return true;
         }
 
+        /// <summary>
+        /// Force the next frame to seek the frame-stable clock straight to the
+        /// reference gameplay time instead of catching up one frame-interval at a time.
+        /// Used by mid-map break skip so audio and hitobjects stay visually synced.
+        /// </summary>
+        public void RequestDirectSeek() => firstConsumption = true;
+
         private void updateClock()
         {
             if (waitingOnFrames.Value)

@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
@@ -10,6 +11,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
@@ -26,6 +28,9 @@ namespace osu.Game.Overlays.Toolbar
         public const float PADDING = 3;
 
         protected GlobalAction? Hotkey { get; set; }
+
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Pink);
+        private IDisposable? customUiHueBinding;
 
         public void SetIcon(Drawable icon)
         {
@@ -87,7 +92,6 @@ namespace osu.Game.Overlays.Toolbar
                                 HoverBackground = new Box
                                 {
                                     RelativeSizeAxes = Axes.Both,
-                                    Colour = OsuColour.Gray(80).Opacity(180),
                                     Blending = BlendingParameters.Additive,
                                     Alpha = 0,
                                 },
@@ -95,7 +99,6 @@ namespace osu.Game.Overlays.Toolbar
                                 {
                                     RelativeSizeAxes = Axes.Both,
                                     Alpha = 0,
-                                    Colour = Color4.White.Opacity(100),
                                     Blending = BlendingParameters.Additive,
                                 },
                             }
@@ -124,7 +127,7 @@ namespace osu.Game.Overlays.Toolbar
                 tooltipContainer = new FillFlowContainer
                 {
                     Direction = FillDirection.Vertical,
-                    RelativeSizeAxes = Axes.Both, // stops us being considered in parent's autosize
+                    RelativeSizeAxes = Axes.Both,
                     Anchor = TooltipAnchor.HasFlag(Anchor.x0) ? Anchor.BottomLeft : Anchor.BottomRight,
                     Origin = TooltipAnchor,
                     Position = new Vector2(TooltipAnchor.HasFlag(Anchor.x0) ? 5 : -5, 5),
@@ -155,8 +158,18 @@ namespace osu.Game.Overlays.Toolbar
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuConfigManager config)
         {
+            customUiHueBinding = CustomUiHueHelper.BindFullScheme(
+                config,
+                colourProvider,
+                OverlayColourScheme.Pink.GetHue(),
+                CustomUiHueScope.Menu);
+
+            colourProvider.ColoursChanged += updateColours;
+
+            updateColours();
+
             if (Hotkey != null)
             {
                 subTooltipFlow.Add(new HotkeyDisplay
@@ -167,6 +180,15 @@ namespace osu.Game.Overlays.Toolbar
                     Margin = new MarginPadding { Left = 3 },
                 });
             }
+        }
+
+        private void updateColours()
+        {
+            HoverBackground.Colour = colourProvider.Highlight1.Opacity(0.35f);
+            flashBackground.Colour = colourProvider.Highlight1.Opacity(0.45f);
+
+            tooltip1.Colour = Color4.White;
+            tooltip2.Colour = colourProvider.Light1;
         }
 
         protected override bool OnMouseDown(MouseDownEvent e) => false;
@@ -205,6 +227,14 @@ namespace osu.Game.Overlays.Toolbar
 
         public void OnReleased(KeyBindingReleaseEvent<GlobalAction> e)
         {
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            colourProvider.ColoursChanged -= updateColours;
+            customUiHueBinding?.Dispose();
         }
     }
 

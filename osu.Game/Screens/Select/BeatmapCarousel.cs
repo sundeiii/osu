@@ -1111,6 +1111,92 @@ namespace osu.Game.Screens.Select
             return true;
         }
 
+        public bool SelectNextEntry()
+        {
+            return selectAdjacentEntry(1);
+        }
+
+        public bool SelectPreviousEntry()
+        {
+            return selectAdjacentEntry(-1);
+        }
+
+        public bool SelectNextSet()
+        {
+            return selectAdjacentSet(1);
+        }
+
+        public bool SelectPreviousSet()
+        {
+            return selectAdjacentSet(-1);
+        }
+
+        private bool selectAdjacentEntry(int direction)
+        {
+            var carouselItems = GetCarouselItems()?.Where(i => i.Model is GroupedBeatmap).ToArray();
+
+            if (carouselItems?.Any() != true)
+                return false;
+
+            int currentIndex = -1;
+
+            if (CurrentSelection is GroupedBeatmap current)
+                currentIndex = Array.FindIndex(carouselItems, i => CheckModelEquality(i.Model, current));
+
+            if (currentIndex < 0 && CurrentSelectionItem != null)
+                currentIndex = Array.IndexOf(carouselItems, CurrentSelectionItem);
+
+            if (currentIndex < 0)
+                currentIndex = direction > 0 ? -1 : carouselItems.Length;
+
+            int nextIndex = currentIndex + direction;
+
+            if (nextIndex < 0 || nextIndex >= carouselItems.Length)
+                return false;
+
+            RequestSelection((GroupedBeatmap)carouselItems[nextIndex].Model);
+            return true;
+        }
+
+        private bool selectAdjacentSet(int direction)
+        {
+            var carouselItems = GetCarouselItems()?.Where(i => i.Model is GroupedBeatmap).ToArray();
+
+            if (carouselItems?.Any() != true)
+                return false;
+
+            if (CurrentGroupedBeatmap == null)
+                return false;
+
+            var currentSet = CurrentGroupedBeatmap.Beatmap.BeatmapSet;
+
+            int currentIndex = Array.FindIndex(carouselItems, i => CheckModelEquality(i.Model, CurrentGroupedBeatmap));
+
+            if (currentIndex < 0 && CurrentSelectionItem != null)
+                currentIndex = Array.IndexOf(carouselItems, CurrentSelectionItem);
+
+            if (currentIndex < 0)
+                return false;
+
+            for (int i = currentIndex + direction; i >= 0 && i < carouselItems.Length; i += direction)
+            {
+                var groupedBeatmap = (GroupedBeatmap)carouselItems[i].Model;
+
+                if (!EqualityComparer<BeatmapSetInfo?>.Default.Equals(groupedBeatmap.Beatmap.BeatmapSet, currentSet))
+                {
+                    if (CurrentSelectionItem == null)
+                        playSpinSample(0);
+                    else
+                        playSpinSample(visiblePanelCountBetweenItems(carouselItems[i], CurrentSelectionItem));
+
+                    RequestSelection(groupedBeatmap);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public bool PreviousRandom()
         {
             var carouselItems = GetCarouselItems();

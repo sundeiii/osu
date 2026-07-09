@@ -10,6 +10,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
@@ -28,7 +29,9 @@ using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Play.Leaderboards;
 using osu.Game.Skinning;
 using osu.Game.Users.Drawables;
@@ -75,6 +78,8 @@ namespace osu.Game.Screens.Select
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
         private readonly IBindable<LeaderboardScores?> scores = new Bindable<LeaderboardScores?>();
+
+        private Bindable<ScoringMode> scoringMode = null!;
 
         private OsuScrollContainer scoreScroll = null!;
         private Container scoreContainer = null!;
@@ -148,6 +153,7 @@ namespace osu.Game.Screens.Select
                 {
                     Anchor = Anchor.TopLeft,
                     Origin = Anchor.TopLeft,
+                    Depth = -10,
                     Position = new Vector2(8, 117),
                     Width = 309,
                     AccentColour = new Color4(31 / 255f, 184 / 255f, 255 / 255f, 1f),
@@ -194,7 +200,17 @@ namespace osu.Game.Screens.Select
 
             inputManager = GetContainingInputManager()!;
 
-            legacyActive = config.GetBindable<bool>(OsuSetting.ToriiLegacyFooterUseSkin);
+            legacyActive = config.GetBindable<bool>(OsuSetting.ToriiLegacySongSelectFooter);
+
+            var savedScope = config.GetBindable<string>(OsuSetting.ToriiLegacyLeaderboardScope);
+
+            if (Enum.TryParse(savedScope.Value, out BeatmapLeaderboardScope loadedScope))
+                Scope.Value = loadedScope;
+
+            Scope.BindValueChanged(scope => savedScope.Value = scope.NewValue.ToString());
+
+            scoringMode = config.GetBindable<ScoringMode>(OsuSetting.ScoreDisplayMode);
+            scoringMode.BindValueChanged(_ => updateScores());
 
             scores.BindTo(leaderboardManager.Scores);
             scores.BindValueChanged(_ => updateScores());
@@ -219,6 +235,17 @@ namespace osu.Game.Screens.Select
                 return;
 
             leaderboardManager.FetchWithCriteria(new LeaderboardCriteria(beatmap.Value?.BeatmapInfo, ruleset.Value, Scope.Value, null));
+        }
+
+        private static long getDisplayScore(ScoreInfo score, ScoringMode mode)
+        {
+            if (mode == ScoringMode.Standardised)
+                return score.TotalScore;
+
+            if (score.LegacyTotalScore is long legacyTotalScore && legacyTotalScore > 0)
+                return legacyTotalScore;
+
+            return score.GetDisplayScore(mode);
         }
 
         private void updateScores()
@@ -256,13 +283,19 @@ namespace osu.Game.Screens.Select
             noRecords.FadeOut(80);
 
             // hasta 50 (el tope de stable); lo que pase de max_rows scrollea adentro de la lista.
-            var list = top.Take(50).ToList();
+            var list = top
+                .OrderByDescending(s => getDisplayScore(s, scoringMode.Value))
+                .Take(50)
+                .ToList();
             int cascade = 0;
 
             for (int i = 0; i < list.Count; i++)
             {
-                long? diff = i < list.Count - 1 ? list[i].TotalScore - list[i + 1].TotalScore : null;
-                addAnimated(scoreContainer, new LegacyScoreRow(list[i], list[i].User.Username, diff) { Y = i * row_step }, cascade++);
+                long? diff = i < list.Count - 1
+                    ? getDisplayScore(list[i], scoringMode.Value) - getDisplayScore(list[i + 1], scoringMode.Value)
+                    : null;
+
+                addAnimated(scoreContainer, new LegacyScoreRow(list[i], list[i].User.Username, diff, scoringMode.Value) { Y = i * row_step }, cascade++);
             }
 
             // seccion Personal Best, pegada abajo del scroll (las posiciones son relativas a personalBest).
@@ -281,7 +314,7 @@ namespace osu.Game.Screens.Select
                     ? $"#{pos:#,0} of {result.TotalScores:#,0}"
                     : result.UserScore.User.Username;
 
-                addAnimated(personalBest, new LegacyScoreRow(result.UserScore, name, null) { Y = 28 }, cascade++);
+                addAnimated(personalBest, new LegacyScoreRow(result.UserScore, name, null, scoringMode.Value) { Y = 28 }, cascade++);
             }
             else
             {
@@ -335,6 +368,7 @@ namespace osu.Game.Screens.Select
             private readonly ScoreInfo score;
             private readonly string displayName;
             private readonly long? scoreDiff;
+            private readonly ScoringMode scoringMode;
 
             private static readonly OverlayColourProvider fallback_colour = new OverlayColourProvider(OverlayColourScheme.Blue);
 
@@ -361,11 +395,91 @@ namespace osu.Game.Screens.Select
 
             private Box hoverHighlight = null!;
 
-            public LegacyScoreRow(ScoreInfo score, string displayName, long? scoreDiff)
+            public LegacyScoreRow(ScoreInfo score, string displayName, long? scoreDiff, ScoringMode scoringMode)
             {
                 this.score = score;
                 this.displayName = displayName;
                 this.scoreDiff = scoreDiff;
+                this.scoringMode = scoringMode;
+            }
+
+            private static Drawable createRankDrawable(ISkinSource skin, ScoreRank rank)
+            {
+                var texture = skin.GetTexture($@"ranking-{rank}-small");
+
+                // Normal skins: use the skin's rank letter.
+                // Example: BTMC skin, normal SS/S/A/etc texture.
+                if (texture != null && texture.Height > 0 && texture.Width <= texture.Height * 8)
+                {
+                    const float rank_height = 42f;
+                    float rankWidth = texture.Width * (rank_height / texture.Height);
+
+                    return new Sprite
+                    {
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                        Position = new Vector2(56, 0),
+                        Size = new Vector2(rankWidth, rank_height),
+                        Texture = texture,
+                    };
+                }
+
+                // Weird wide skins: do not use the giant strip as the letter.
+                // Zynight uses the wide texture as row art, handled by createRankRowBackground().
+                return new UpdateableRank(rank)
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Position = new Vector2(56, 0),
+                    Size = new Vector2(40),
+                };
+            }
+
+            private static Drawable? createRankRowBackground(ISkinSource skin, ScoreRank rank)
+            {
+                var texture = skin.GetTexture($@"ranking-{rank}-small");
+
+                if (texture == null || texture.Height <= 0)
+                    return null;
+
+                // Normal rank icons should NOT become row backgrounds.
+                if (texture.Width <= texture.Height * 8)
+                    return null;
+
+                // Wide skin rank textures (Zynight / Zylice style):
+                // take the LEFT part only.
+                const float targetAspect = 1123f / 174f;
+
+                float sourceHeight = texture.Height;
+                float sourceWidth = Math.Min(texture.Width, sourceHeight * targetAspect);
+
+                const float cut_left = 72f;
+
+                texture = texture.Crop(new RectangleF(
+                    cut_left,
+                    0,
+                    Math.Max(1, sourceWidth - cut_left),
+                    sourceHeight
+                ));
+
+                return new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Masking = true,
+                    Child = new Sprite
+                    {
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+
+                        // Move wide skin row art to the right.
+                        Position = new Vector2(138, 0),
+
+                        Height = 50,
+                        Width = 50 * (texture.Width / (float)texture.Height),
+                        Texture = texture,
+                        Alpha = 0.65f,
+                    },
+                };
             }
 
             [BackgroundDependencyLoader]
@@ -373,6 +487,8 @@ namespace osu.Game.Screens.Select
             {
                 RelativeSizeAxes = Axes.X;
                 Height = 50;
+                Masking = true;
+                CornerRadius = 4;
 
                 if (songSelect?.CanPresentScore == true)
                     Action = () => songSelect.PresentScore(score);
@@ -395,6 +511,10 @@ namespace osu.Game.Screens.Select
                 rightColumn.Add(shadowed($"{score.Accuracy:0.00%}", 16, FontWeight.Bold, Anchor.TopRight));
                 rightColumn.Add(shadowed(scoreDiff is long d ? $"+{d:#,0}" : @"-", 13, FontWeight.Regular, Anchor.TopRight, new Color4(0.82f, 0.86f, 0.9f, 1f)));
 
+
+                var rankRowBackground = createRankRowBackground(skin, score.Rank);
+
+
                 Children = new Drawable[]
                 {
                     new Container
@@ -404,21 +524,24 @@ namespace osu.Game.Screens.Select
                         CornerRadius = 4,
                         Children = new Drawable[]
                         {
-                            // mas claro que antes; la fila de stable es ~negro 0.47, desvaneciendose a la derecha.
                             new Box
                             {
                                 RelativeSizeAxes = Axes.Both,
                                 Colour = ColourInfo.GradientHorizontal(new Color4(0f, 0f, 0f, 0.5f), new Color4(0f, 0f, 0f, 0.12f)),
                             },
-                            hoverHighlight = new Box
-                            {
-                                RelativeSizeAxes = Axes.Both,
-                                Colour = Color4.White,
-                                Alpha = 0,
-                            },
                         },
                     },
-                    // orden de stable: primero el avatar (a la izquierda del todo), despues el badge de grade, despues el nombre.
+
+                    // Zynight/wide skin rank artwork fitted into the row background.
+                    rankRowBackground ?? Empty(),
+
+                    hoverHighlight = new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.White,
+                        Alpha = 0,
+                    },
+
                     new UpdateableAvatar(score.User, isInteractive: false)
                     {
                         Anchor = Anchor.CentreLeft,
@@ -428,15 +551,9 @@ namespace osu.Game.Screens.Select
                         Masking = true,
                         CornerRadius = 4,
                     },
-                    new Sprite
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        X = 56,
-                        Size = new Vector2(44),
-                        FillMode = FillMode.Fit,
-                        Texture = skin.GetTexture($@"ranking-{score.Rank}-small"),
-                    },
+
+                    createRankDrawable(skin, score.Rank),
+
                     new FillFlowContainer
                     {
                         Anchor = Anchor.CentreLeft,
@@ -447,9 +564,10 @@ namespace osu.Game.Screens.Select
                         Children = new Drawable[]
                         {
                             shadowed(displayName, 25, FontWeight.Regular, Anchor.TopLeft),
-                            shadowed($"Score: {score.TotalScore:#,0} ({score.MaxCombo:#,0}x)", 17, FontWeight.Regular, Anchor.TopLeft),
+                            shadowed($"Score: {getDisplayScore(score, scoringMode):#,0} ({score.MaxCombo:#,0}x)", 17, FontWeight.Regular, Anchor.TopLeft),
                         },
                     },
+
                     rightColumn,
                 };
             }

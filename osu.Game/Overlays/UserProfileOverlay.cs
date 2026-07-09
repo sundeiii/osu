@@ -17,6 +17,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Game.Extensions;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
@@ -51,10 +52,15 @@ namespace osu.Game.Overlays
         private IUser? user;
         private IRulesetInfo? ruleset;
 
+        private int currentProfileHue = OverlayColourScheme.Pink.GetHue();
+
         private readonly IBindable<APIState> apiState = new Bindable<APIState>();
 
         [Resolved]
         private RulesetStore rulesets { get; set; } = null!;
+
+        [Resolved]
+        private OsuConfigManager config { get; set; } = null!;
 
         public UserProfileOverlay()
             : base(OverlayColourScheme.Pink)
@@ -82,6 +88,15 @@ namespace osu.Game.Overlays
                 if (state.NewValue == APIState.Online && user != null)
                     Scheduler.AddOnce(fetchAndSetContent);
             }));
+
+            config.GetBindable<bool>(OsuSetting.CustomUIHueEnabled).BindValueChanged(_ => applyCurrentHue());
+            config.GetBindable<float>(OsuSetting.CustomUIHue).BindValueChanged(_ => applyCurrentHue());
+            config.GetBindable<bool>(OsuSetting.CustomUIHueApplyToOverlays).BindValueChanged(_ => applyCurrentHue());
+        }
+
+        private void applyCurrentHue()
+        {
+            Schedule(() => changeOverlayColours(currentProfileHue));
         }
 
         protected override ProfileHeader CreateHeader() => new ProfileHeader();
@@ -128,7 +143,10 @@ namespace osu.Game.Overlays
                 : Array.Empty<ProfileSection>();
 
             if (!sameUser)
-                changeOverlayColours(OverlayColourScheme.Pink.GetHue());
+            {
+                currentProfileHue = OverlayColourScheme.Pink.GetHue();
+                changeOverlayColours(currentProfileHue);
+            }
 
             recreateBaseContent();
 
@@ -187,9 +205,9 @@ namespace osu.Game.Overlays
         {
             Debug.Assert(sections != null && sectionsContainer != null && tabs != null);
 
-            int profileHue = loadedUser.ProfileHue ?? OverlayColourScheme.Pink.GetHue();
+            currentProfileHue = loadedUser.ProfileHue ?? OverlayColourScheme.Pink.GetHue();
 
-            if (changeOverlayColours(profileHue))
+            if (changeOverlayColours(currentProfileHue))
                 recreateBaseContent();
 
             RulesetInfo? actualRuleset = rulesets.GetRuleset(userRuleset?.ShortName ?? loadedUser.PlayMode);
@@ -317,10 +335,15 @@ namespace osu.Game.Overlays
 
         private bool changeOverlayColours(int hue)
         {
-            if (hue == ColourProvider.Hue)
+            int resolvedHue = CustomUiHueHelper.ResolveHue(
+                config,
+                hue,
+                CustomUiHueScope.Overlays);
+
+            if (resolvedHue == ColourProvider.Hue)
                 return false;
 
-            ColourProvider.ChangeColourScheme(hue);
+            ColourProvider.ChangeColourScheme(resolvedHue);
 
             RecreateHeader();
             UpdateColours();

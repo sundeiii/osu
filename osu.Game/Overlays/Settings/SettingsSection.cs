@@ -26,6 +26,8 @@ namespace osu.Game.Overlays.Settings
         private IBindable<SettingsSection> selectedSection;
 
         private Box dim;
+        private Box separator;
+        private OverlayColourProvider colourProvider;
 
         private const float inactive_alpha = 0.8f;
 
@@ -84,12 +86,14 @@ namespace osu.Game.Overlays.Settings
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider)
         {
+            this.colourProvider = colourProvider;
+            colourProvider.ColoursChanged += updateColours;
+
             AddRangeInternal(new Drawable[]
             {
-                new Box
+                separator = new Box
                 {
                     Name = "separator",
-                    Colour = colourProvider.Background6,
                     RelativeSizeAxes = Axes.X,
                     Height = border_size,
                 },
@@ -123,7 +127,6 @@ namespace osu.Game.Overlays.Settings
                         dim = new Box
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Colour = colourProvider.Background5,
                             Alpha = inactive_alpha,
                         },
                     }
@@ -132,6 +135,7 @@ namespace osu.Game.Overlays.Settings
 
             selectedSection = settingsPanel?.CurrentSection.GetBoundCopy() ?? new Bindable<SettingsSection>(this);
             selectedSection.BindValueChanged(_ => updateContentFade(), true);
+            updateColours();
         }
 
         private bool isCurrentSection => selectedSection.Value == this;
@@ -163,7 +167,11 @@ namespace osu.Game.Overlays.Settings
             // only the current section should accept input.
             // this provides the behaviour of the first click scrolling the target section to the centre of the screen.
             isCurrentSection;
-
+        private void updateColours()
+        {
+            separator.Colour = colourProvider.Background6;
+            dim.Colour = colourProvider.Background5;
+        }
         private void updateContentFade()
         {
             float dimFade = 0;
@@ -174,6 +182,13 @@ namespace osu.Game.Overlays.Settings
             }
 
             dim.FadeTo(dimFade, 300, Easing.OutQuint);
+        }
+        protected override void Dispose(bool isDisposing)
+        {
+            if (colourProvider != null)
+                colourProvider.ColoursChanged -= updateColours;
+
+            base.Dispose(isDisposing);
         }
     }
 }

@@ -13,6 +13,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
+using osu.Game.Overlays;
 using osuTK;
 
 namespace osu.Game.Overlays.Settings
@@ -28,6 +29,9 @@ namespace osu.Game.Overlays.Settings
 
         private readonly bool showBackButton;
 
+        private OverlayColourProvider colourProvider = null!;
+        private Box background = null!;
+
         public SettingsSidebar(bool showBackButton)
             : base(CONTRACTED_WIDTH, EXPANDED_WIDTH)
         {
@@ -38,12 +42,16 @@ namespace osu.Game.Overlays.Settings
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider)
         {
-            AddInternal(new Box
+            this.colourProvider = colourProvider;
+            colourProvider.ColoursChanged += updateColours;
+
+            AddInternal(background = new Box
             {
-                Colour = colourProvider.Background5,
                 RelativeSizeAxes = Axes.Both,
                 Depth = float.MaxValue
             });
+
+            updateColours();
 
             if (showBackButton)
             {
@@ -54,6 +62,19 @@ namespace osu.Game.Overlays.Settings
                     Action = () => BackButtonAction?.Invoke(),
                 });
             }
+        }
+
+        private void updateColours()
+        {
+            background.Colour = colourProvider.Background5;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (colourProvider != null)
+                colourProvider.ColoursChanged -= updateColours;
+
+            base.Dispose(isDisposing);
         }
 
         public partial class BackButton : SidebarButton

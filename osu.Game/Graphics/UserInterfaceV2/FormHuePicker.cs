@@ -154,14 +154,6 @@ namespace osu.Game.Graphics.UserInterfaceV2
 
         public float MainDrawHeight => DrawHeight;
 
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                colourProvider.ColoursChanged -= updateState;
-
-            base.Dispose(isDisposing);
-        }
-
         // -----------------------------------------------------------------
         // Swatch button — clickable preview that opens the popover.
         // Shows the live hex code instead of the previous "23°" label,
@@ -237,11 +229,15 @@ namespace osu.Game.Graphics.UserInterfaceV2
             {
             }
 
+            private OverlayColourProvider colourProvider = null!;
+
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colourProvider)
             {
+                this.colourProvider = colourProvider;
+                colourProvider.ColoursChanged += updateColours;
+
                 Body.BorderThickness = 2;
-                Body.BorderColour = colourProvider.Highlight1;
                 Content.Padding = new MarginPadding(8);
 
                 Child = new HueOnlyPicker(colourProvider)
@@ -249,6 +245,21 @@ namespace osu.Game.Graphics.UserInterfaceV2
                     Width = 280,
                     CurrentHue = { BindTarget = CurrentHue },
                 };
+
+                updateColours();
+            }
+
+            private void updateColours()
+            {
+                Body.BorderColour = colourProvider.Highlight1;
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                if (colourProvider != null)
+                    colourProvider.ColoursChanged -= updateColours;
+
+                base.Dispose(isDisposing);
             }
         }
 
@@ -265,6 +276,12 @@ namespace osu.Game.Graphics.UserInterfaceV2
             private readonly OverlayColourProvider colourProvider;
             private InlineHueSelector selector = null!;
             private OsuSpriteText hexLabel = null!;
+
+            private void updateColours()
+            {
+                if (hexLabel != null)
+                    hexLabel.Colour = colourProvider.Content1;
+            }
 
             public HueOnlyPicker(OverlayColourProvider colourProvider)
             {
@@ -299,8 +316,9 @@ namespace osu.Game.Graphics.UserInterfaceV2
             {
                 base.LoadComplete();
 
-                // selector.Hue is normalized 0..1; CurrentHue is degrees 0..359.
-                // Bridge the two without recursion via a syncing flag.
+                colourProvider.ColoursChanged += updateColours;
+                updateColours();
+
                 bool syncing = false;
 
                 selector.Hue.BindValueChanged(h =>
@@ -322,6 +340,13 @@ namespace osu.Game.Graphics.UserInterfaceV2
 
                     updateLabel();
                 }, true);
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                colourProvider.ColoursChanged -= updateColours;
+
+                base.Dispose(isDisposing);
             }
 
             private void updateLabel()

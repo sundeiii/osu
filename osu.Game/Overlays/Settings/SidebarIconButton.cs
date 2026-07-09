@@ -25,6 +25,8 @@ namespace osu.Game.Overlays.Settings
         private readonly CircularContainer selectionIndicator;
         private readonly Container textIconContent;
 
+        private bool coloursBound;
+
         // always consider as part of flow, even when not visible (for the sake of the initial animation).
         public override bool IsPresent => true;
 
@@ -110,7 +112,16 @@ namespace osu.Game.Overlays.Settings
         [BackgroundDependencyLoader]
         private void load()
         {
+            ColourProvider.ColoursChanged += updateColours;
+            coloursBound = true;
+
+            updateColours();
+        }
+
+        private void updateColours()
+        {
             selectionIndicator.Colour = ColourProvider.Highlight1;
+            UpdateState();
         }
 
         protected override void UpdateState()
@@ -131,6 +142,14 @@ namespace osu.Game.Overlays.Settings
                 selectionIndicator.FadeOut(FADE_DURATION, Easing.OutQuint);
                 selectionIndicator.ResizeHeightTo(selection_indicator_height_inactive, FADE_DURATION, Easing.OutQuint);
             }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (coloursBound)
+                ColourProvider.ColoursChanged -= updateColours;
+
+            base.Dispose(isDisposing);
         }
     }
 }

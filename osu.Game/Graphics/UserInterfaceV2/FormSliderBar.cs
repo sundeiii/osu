@@ -558,9 +558,8 @@ namespace osu.Game.Graphics.UserInterfaceV2
 
             private void updateState()
             {
-                rightBox.Colour = colourProvider.Background5;
-
-                Color4 leftColour = colourProvider.Light4;
+                rightBox.Colour = colourProvider.Background4;
+                Color4 leftColour = colourProvider.Highlight1;
                 Color4 nubColour;
 
                 if (IsHovered || HasFocus || IsDragged)

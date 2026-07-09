@@ -16,25 +16,32 @@ namespace osu.Game.Overlays.Profile.Header
 {
     public partial class BadgeHeaderContainer : CompositeDrawable
     {
+        private OverlayColourProvider colourProvider = null!;
+
+        private Box background = null!;
         private FillFlowContainer badgeFlowContainer = null!;
 
         public readonly Bindable<UserProfileData?> User = new Bindable<UserProfileData?>();
 
+        private CancellationTokenSource? cancellationTokenSource;
+
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider)
         {
+            this.colourProvider = colourProvider;
+            colourProvider.ColoursChanged += updateColours;
+
             Alpha = 0;
             AutoSizeAxes = Axes.Y;
             User.ValueChanged += e => updateDisplay(e.NewValue?.User);
 
             InternalChildren = new Drawable[]
             {
-                new Box
+                background = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background4,
                 },
-                new Container // artificial shadow
+                new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 3,
@@ -53,9 +60,14 @@ namespace osu.Game.Overlays.Profile.Header
                     Padding = new MarginPadding { Horizontal = WaveOverlayContainer.HORIZONTAL_PADDING, Vertical = 10 },
                 }
             };
+
+            updateColours();
         }
 
-        private CancellationTokenSource? cancellationTokenSource;
+        private void updateColours()
+        {
+            background.Colour = colourProvider.Background4;
+        }
 
         private void updateDisplay(APIUser? user)
         {
@@ -75,7 +87,6 @@ namespace osu.Game.Overlays.Profile.Header
                     int displayIndex = index;
                     LoadComponentAsync(new DrawableBadge(badges[index]), asyncBadge =>
                     {
-                        // load in stable order regardless of async load order.
                         badgeFlowContainer.Insert(displayIndex, asyncBadge);
                     }, cancellationTokenSource.Token);
                 }
@@ -89,6 +100,10 @@ namespace osu.Game.Overlays.Profile.Header
         protected override void Dispose(bool isDisposing)
         {
             cancellationTokenSource?.Cancel();
+
+            if (colourProvider != null)
+                colourProvider.ColoursChanged -= updateColours;
+
             base.Dispose(isDisposing);
         }
     }

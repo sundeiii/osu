@@ -51,6 +51,7 @@ using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
+using osu.Game.Skinning.Select;
 using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
@@ -325,12 +326,21 @@ namespace osu.Game.Screens.Select
                     TargetDrawSize = new Vector2(1366, 768),
                     Strategy = DrawSizePreservationStrategy.Minimum,
                     Alpha = 0,
+                    Depth = -1000,
+
                     Child = new LegacySongSelectTop
                     {
-                        Anchor = Anchor.TopLeft,
-                        Origin = Anchor.TopLeft,
-                        RelativeSizeAxes = Axes.Both,
                         FilterControl = FilterControl,
+                        SelectPreviousAction = () =>
+                        {
+                            if (!carousel.SelectPreviousSet())
+                                errorSample?.Play();
+                        },
+                        SelectNextAction = () =>
+                        {
+                            if (!carousel.SelectNextSet())
+                                errorSample?.Play();
+                        },
                     },
                 },
                 legacyLeaderboardContainer = new DrawSizePreservingFillContainer
@@ -339,6 +349,8 @@ namespace osu.Game.Screens.Select
                     TargetDrawSize = new Vector2(1366, 768),
                     Strategy = DrawSizePreservationStrategy.Minimum,
                     Alpha = 0,
+                    Depth = -2000,
+
                     Child = new OsuContextMenuContainer
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -370,10 +382,13 @@ namespace osu.Game.Screens.Select
             legacyUi = config.GetBindable<bool>(OsuSetting.ToriiLegacySongSelectFooter);
             legacyUi.BindValueChanged(e =>
             {
-                if (e.NewValue && this.IsCurrentScreen())
-                    rebuildLegacyChrome();
-                else
-                    updateLegacyChrome();
+                Schedule(() =>
+                {
+                    if (e.NewValue && this.IsCurrentScreen())
+                        rebuildLegacyChrome();
+                    else
+                        updateLegacyChrome();
+                });
             }, true);
         }
 
@@ -473,34 +488,42 @@ namespace osu.Game.Screens.Select
                 updateDebounce();
         }
 
+
+        private void onSkinChangedWhileLegacy()
+        {
+            if (legacyUi?.Value != true || !this.IsCurrentScreen())
+                return;
+
+            Schedule(rebuildLegacyChrome);
+        }
+
         private void updateLegacyChrome()
         {
-            if (FilterControl == null || wedgesContainer == null || legacyTopContainer == null || legacyLeaderboardContainer == null)
+            if (FilterControl == null
+                || wedgesContainer == null
+                || rightGradientBackground == null
+                || mainGridContainer == null
+                || legacyTopContainer == null
+                || legacyLeaderboardContainer == null
+                || legacyUi == null)
                 return;
 
             bool legacy = legacyUi.Value;
 
             (game as OsuGame)?.SetLegacyScreenAspectLock(legacy ? 1366f / 768f : null);
 
-            // Hide lazer chrome only.
+            // Hide lazer chrome.
             FilterControl.FadeTo(legacy ? 0 : 1, 200, Easing.OutQuint);
             wedgesContainer.FadeTo(legacy ? 0 : 1, 200, Easing.OutQuint);
             rightGradientBackground.FadeTo(legacy ? 0 : 1, 200, Easing.OutQuint);
+            Footer?.FadeTo(1, 200, Easing.OutQuint);
 
-            // Keep mainGridContainer visible so the beatmap carousel stays visible.
+            // Keep the carousel visible.
             mainGridContainer.FadeTo(1, 200, Easing.OutQuint);
 
-            // Show Torii/stable chrome.
+            // Show legacy/stable chrome.
             legacyTopContainer.FadeTo(legacy ? 1 : 0, 200, Easing.OutQuint);
             legacyLeaderboardContainer.FadeTo(legacy ? 1 : 0, 200, Easing.OutQuint);
-        }
-
-        private void onSkinChangedWhileLegacy()
-        {
-            if (!legacyUi.Value || !this.IsCurrentScreen())
-                return;
-
-            Schedule(rebuildLegacyChrome);
         }
 
         private void rebuildLegacyChrome()
@@ -517,10 +540,17 @@ namespace osu.Game.Screens.Select
             {
                 topContainer.Child = new LegacySongSelectTop
                 {
-                    Anchor = Anchor.TopLeft,
-                    Origin = Anchor.TopLeft,
-                    RelativeSizeAxes = Axes.Both,
                     FilterControl = FilterControl,
+                    SelectPreviousAction = () =>
+                    {
+                        if (!carousel.SelectPreviousSet())
+                            errorSample?.Play();
+                    },
+                    SelectNextAction = () =>
+                    {
+                        if (!carousel.SelectNextSet())
+                            errorSample?.Play();
+                    },
                 };
 
                 leaderboardContainer.Child = new OsuContextMenuContainer
@@ -1152,7 +1182,8 @@ namespace osu.Game.Screens.Select
                 skinnableContent.ScaleTo(1, 500, Easing.OutQuint);
                 skinnableContent.FadeIn(500, Easing.OutQuint);
 
-                Footer?.Show();
+                if (legacyUi?.Value != true)
+                    Footer?.Show();
             }
 
             revealBackgroundDelegate.Cancel();
@@ -1201,7 +1232,38 @@ namespace osu.Game.Screens.Select
 
         protected override bool OnKeyDown(KeyDownEvent e)
         {
-            if (e.Repeat) return false;
+            if (e.Repeat && legacyUi?.Value != true)
+                return false;
+
+            if (legacyUi?.Value == true)
+            {
+                switch (e.Key)
+                {
+                    case Key.Left:
+                        if (!carousel.SelectPreviousSet())
+                            errorSample?.Play();
+
+                        return true;
+
+                    case Key.Right:
+                        if (!carousel.SelectNextSet())
+                            errorSample?.Play();
+
+                        return true;
+
+                    case Key.Up:
+                        if (!carousel.SelectPreviousEntry())
+                            errorSample?.Play();
+
+                        return true;
+
+                    case Key.Down:
+                        if (!carousel.SelectNextEntry())
+                            errorSample?.Play();
+
+                        return true;
+                }
+            }
 
             switch (e.Key)
             {

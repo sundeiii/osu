@@ -15,6 +15,7 @@ using osu.Game.Beatmaps.Drawables.Cards;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
+using osu.Game.Online.API;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dashboard.Friends;
@@ -70,6 +71,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ToriiLegacyFooterUseSkin, false);
             SetDefault(OsuSetting.ToriiLegacySongSelectFooter, false);
+            SetDefault(OsuSetting.ToriiLegacyLeaderboardScope, @"Local");
 
             SetDefault(OsuSetting.CustomUIHueEnabled, false);
             SetDefault(OsuSetting.CustomUIHue, 320f, 0f, 359f, 1f);
@@ -80,6 +82,15 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.CustomUIAccentHue, 250f, 0f, 359f, 1f);
             SetDefault(OsuSetting.CustomUIAccentUnlocked, true);
             SetDefault(OsuSetting.UITheme, UIThemeOption.Torii);
+            SetDefault(OsuSetting.ToriiAutoHideToolbar, false);
+            SetDefault(OsuSetting.ToriiToolbarHintShown, false);
+            SetDefault(OsuSetting.ToriiToolbarToggleCount, 0);
+            SetDefault(OsuSetting.ToriiStablePromoShown, false);
+
+            SetDefault(OsuSetting.ToriiSkipBreaksEnabled, true);
+            SetDefault(OsuSetting.ToriiSkipBreaksSingleConfirmation, false);
+            SetDefault(OsuSetting.ToriiSkipBreaksBriefingSeen, false);
+            SetDefault(OsuSetting.ResultScreenStyle, ResultScreenStyle.Default);
             // Online settings
             SetDefault(OsuSetting.Username, string.Empty);
             SetDefault(OsuSetting.Token, string.Empty);
@@ -103,7 +114,7 @@ namespace osu.Game.Configuration
                 }
             };
 
-            SetDefault(OsuSetting.CustomApiUrl, string.Empty);
+            SetDefault(OsuSetting.CustomApiUrl, "lazer-api.rinarii.de");
 
             SetDefault(OsuSetting.ExternalLinkWarning, true);
             SetDefault(OsuSetting.PreferNoVideo, false);
@@ -420,7 +431,16 @@ namespace osu.Game.Configuration
         AudioOffset,
         ToriiLegacyFooterUseSkin,
         ToriiLegacySongSelectFooter,
+        ToriiLegacyLeaderboardScope,
+        ToriiAutoHideToolbar,
+        ToriiToolbarHintShown,
+        ToriiToolbarToggleCount,
+        ToriiStablePromoShown,
+        ToriiSkipBreaksEnabled,
+        ToriiSkipBreaksSingleConfirmation,
+        ToriiSkipBreaksBriefingSeen,
         UITheme,
+        ResultScreenStyle,
         CustomUIHueEnabled,
         CustomUIHue,
         CustomUIHueApplyToMenu,
@@ -554,5 +574,10 @@ namespace osu.Game.Configuration
         /// Disables automatic updates for the GU version.
         /// </summary>
         DisableAutomaticUpdates
+    }
+    public enum ResultScreenStyle
+    {
+        Default,
+        Clean,
     }
 }

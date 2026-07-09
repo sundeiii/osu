@@ -126,7 +126,7 @@ namespace osu.Game.Localisation
         /// <summary>
         /// "Current server: {0}"
         /// </summary>
-        public static LocalisableString CurrentServer(string serverName) => new TranslatableString(getKey(@"current_server"), @"Current server: {0}", serverName);
+        public static LocalisableString CurrentServer(string serverName) => new TranslatableString(getKey(@"current_server"), @"Connected to Rinari services");
 
         /// <summary>
         /// "Official server (osu.ppy.sh)"
@@ -141,7 +141,7 @@ namespace osu.Game.Localisation
         /// <summary>
         /// "Default server"
         /// </summary>
-        public static LocalisableString DefaultServer => new TranslatableString(getKey(@"default_server"), @"Default server");
+        public static LocalisableString DefaultServer => new TranslatableString(getKey(@"default_server"), @"Rinari server");
 
         private static string getKey(string key) => $@"{prefix}:{key}";
     }
