@@ -30,7 +30,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Restore Packages
-        run: dotnet restore osu.Desktop.slnf
+        run: dotnet restore osu.Desktop/osu.Desktop.csproj
 
       - name: Restore inspectcode cache
         uses: actions/cache@v5
@@ -39,7 +39,7 @@ jobs:
           key: inspectcode-${{ hashFiles('.config/dotnet-tools.json', '.github/workflows/ci.yml', 'osu.sln*', 'osu*.slnf', '.editorconfig', '.globalconfig', 'CodeAnalysis/*', '**/*.csproj', '**/*.props') }}
 
       - name: Dotnet code style
-        run: dotnet build -c Debug -warnaserror osu.Desktop.slnf -p:EnforceCodeStyleInBuild=true
+        run: dotnet build -c Debug -warnaserror osu.Desktop/osu.Desktop.csproj -p:EnforceCodeStyleInBuild=true
 
       - name: CodeFileSanity
         run: |
@@ -60,7 +60,7 @@ jobs:
           # this is WTF tier but if you don't specify *both* of these the defaults assume `build: true`
           build: false
           no-build: true
-          solution: ./osu.Desktop.slnf
+          solution: ./osu.sln
           caches-home: inspectcode
           verbosity: WARN
 
@@ -94,7 +94,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Compile
-        run: dotnet build -c Debug -warnaserror osu.Desktop.slnf
+        run: dotnet build -c Debug -warnaserror osu.Desktop/osu.Desktop.csproj
 
       - name: Test
         run: >
