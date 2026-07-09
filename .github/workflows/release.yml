@@ -104,6 +104,11 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+    
+      - name: Checkout custom osu-resources
+        shell: bash
+        run: |
+          git clone https://github.com/sundeiii/rinari-resources.git ../osu-resources
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
