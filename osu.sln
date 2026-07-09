@@ -100,7 +100,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CodeAnalysis", "CodeAnalysi
 		CodeAnalysis\osu.globalconfig = CodeAnalysis\osu.globalconfig
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Resources", "..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj", "{3AF5CCDC-B09B-414B-A938-E764A2BCD108}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Resources", "..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj", "{901FF37C-5FCD-410C-A9B8-A9179315622B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -256,10 +256,10 @@ Global
 		{1743BF7C-E6AE-4A06-BAD9-166D62894303}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1743BF7C-E6AE-4A06-BAD9-166D62894303}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1743BF7C-E6AE-4A06-BAD9-166D62894303}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3AF5CCDC-B09B-414B-A938-E764A2BCD108}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3AF5CCDC-B09B-414B-A938-E764A2BCD108}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3AF5CCDC-B09B-414B-A938-E764A2BCD108}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3AF5CCDC-B09B-414B-A938-E764A2BCD108}.Release|Any CPU.Build.0 = Release|Any CPU
+		{901FF37C-5FCD-410C-A9B8-A9179315622B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{901FF37C-5FCD-410C-A9B8-A9179315622B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{901FF37C-5FCD-410C-A9B8-A9179315622B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{901FF37C-5FCD-410C-A9B8-A9179315622B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
