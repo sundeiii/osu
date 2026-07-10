@@ -1,4 +1,5 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// This file is partly modified by GooGuTeam.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -8,7 +9,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Platform;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -51,8 +51,14 @@ namespace osu.Game.Overlays.Dashboard.Home.News
                             },
                             ColumnDimensions = new[]
                             {
-                                new Dimension(GridSizeMode.Absolute, size: 60),
-                                new Dimension(GridSizeMode.Absolute, size: 20),
+                                new Dimension(
+                                    GridSizeMode.Absolute,
+                                    size: 60),
+
+                                new Dimension(
+                                    GridSizeMode.Absolute,
+                                    size: 20),
+
                                 new Dimension()
                             },
                             Content = new[]
@@ -63,7 +69,10 @@ namespace osu.Game.Overlays.Dashboard.Home.News
                                     new Container
                                     {
                                         RelativeSizeAxes = Axes.Both,
-                                        Padding = new MarginPadding { Vertical = 10 },
+                                        Padding = new MarginPadding
+                                        {
+                                            Vertical = 10
+                                        },
                                         Child = new Box
                                         {
                                             Anchor = Anchor.TopCentre,
@@ -77,16 +86,25 @@ namespace osu.Game.Overlays.Dashboard.Home.News
                                     {
                                         RelativeSizeAxes = Axes.X,
                                         AutoSizeAxes = Axes.Y,
-                                        Margin = new MarginPadding { Top = 5, Bottom = 10 },
-                                        Padding = new MarginPadding { Right = 10 },
+                                        Margin = new MarginPadding
+                                        {
+                                            Top = 5,
+                                            Bottom = 10
+                                        },
+                                        Padding = new MarginPadding
+                                        {
+                                            Right = 10
+                                        },
                                         Spacing = new Vector2(0, 10),
                                         Direction = FillDirection.Vertical,
                                         Children = new Drawable[]
                                         {
                                             new NewsTitleLink(post),
-                                            new TextFlowContainer(f =>
+                                            new TextFlowContainer(text =>
                                             {
-                                                f.Font = OsuFont.GetFont(size: 12, weight: FontWeight.Regular);
+                                                text.Font = OsuFont.GetFont(
+                                                    size: 12,
+                                                    weight: FontWeight.Regular);
                                             })
                                             {
                                                 RelativeSizeAxes = Axes.X,
@@ -107,6 +125,9 @@ namespace osu.Game.Overlays.Dashboard.Home.News
         {
             private readonly APINewsPost post;
 
+            [Resolved]
+            private NewsOverlay newsOverlay { get; set; } = null!;
+
             public ClickableNewsBackground(APINewsPost post)
             {
                 this.post = post;
@@ -116,27 +137,32 @@ namespace osu.Game.Overlays.Dashboard.Home.News
             }
 
             [BackgroundDependencyLoader]
-            private void load(GameHost host)
+            private void load()
             {
-                Child = new DelayedLoadUnloadWrapper(() => new NewsPostBackground(post.FirstImage)
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    FillMode = FillMode.Fill,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                })
+                Child = new DelayedLoadUnloadWrapper(() =>
+                    new NewsPostBackground(post.FirstImage)
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        FillMode = FillMode.Fill,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre
+                    })
                 {
                     RelativeSizeAxes = Axes.Both
                 };
 
-                TooltipText = "view in browser";
-                Action = () => host.OpenUrlExternally("https://osu.ppy.sh/home/news/" + post.Slug);
+                TooltipText = "read news";
+
+                Action = () =>
+                    newsOverlay.ShowArticle(post.Slug);
 
                 HoverColour = Color4.White;
             }
         }
 
-        private partial class Date : CompositeDrawable, IHasCustomTooltip<DateTimeOffset>
+        private partial class Date :
+            CompositeDrawable,
+            IHasCustomTooltip<DateTimeOffset>
         {
             private readonly DateTimeOffset date;
 
@@ -151,7 +177,12 @@ namespace osu.Game.Overlays.Dashboard.Home.News
                 AutoSizeAxes = Axes.Both;
                 Anchor = Anchor.TopRight;
                 Origin = Anchor.TopRight;
-                Margin = new MarginPadding { Top = 10 };
+
+                Margin = new MarginPadding
+                {
+                    Top = 10
+                };
+
                 InternalChild = new FillFlowContainer
                 {
                     AutoSizeAxes = Axes.Both,
@@ -164,14 +195,18 @@ namespace osu.Game.Overlays.Dashboard.Home.News
                         {
                             Anchor = Anchor.TopRight,
                             Origin = Anchor.TopRight,
-                            Font = OsuFont.GetFont(weight: FontWeight.Bold), // using Bold since there is no 800 weight alternative
+                            Font = OsuFont.GetFont(
+                                weight: FontWeight.Bold),
                             Colour = colourProvider.Light1,
                             Text = date.ToLocalisableString(@"dd")
                         },
-                        new TextFlowContainer(f =>
+                        new TextFlowContainer(text =>
                         {
-                            f.Font = OsuFont.GetFont(size: 11, weight: FontWeight.Regular);
-                            f.Colour = colourProvider.Light1;
+                            text.Font = OsuFont.GetFont(
+                                size: 11,
+                                weight: FontWeight.Regular);
+
+                            text.Colour = colourProvider.Light1;
                         })
                         {
                             Anchor = Anchor.TopRight,
@@ -183,9 +218,13 @@ namespace osu.Game.Overlays.Dashboard.Home.News
                 };
             }
 
-            ITooltip<DateTimeOffset> IHasCustomTooltip<DateTimeOffset>.GetCustomTooltip() => new DateTooltip();
+            ITooltip<DateTimeOffset>
+                IHasCustomTooltip<DateTimeOffset>.GetCustomTooltip()
+                => new DateTooltip();
 
-            DateTimeOffset IHasCustomTooltip<DateTimeOffset>.TooltipContent => date;
+            DateTimeOffset
+                IHasCustomTooltip<DateTimeOffset>.TooltipContent
+                => date;
         }
     }
 }

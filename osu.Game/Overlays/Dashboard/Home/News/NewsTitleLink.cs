@@ -1,10 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// This file is partly modified by GooGuTeam.
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
-using osu.Framework.Platform;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Online.API.Requests.Responses;
@@ -15,6 +14,9 @@ namespace osu.Game.Overlays.Dashboard.Home.News
     {
         private readonly APINewsPost post;
 
+        [Resolved]
+        private NewsOverlay newsOverlay { get; set; } = null!;
+
         public NewsTitleLink(APINewsPost post)
         {
             this.post = post;
@@ -24,11 +26,12 @@ namespace osu.Game.Overlays.Dashboard.Home.News
         }
 
         [BackgroundDependencyLoader]
-        private void load(GameHost host, OverlayColourProvider colourProvider)
+        private void load(OverlayColourProvider colourProvider)
         {
-            Child = new TextFlowContainer(t =>
+            Child = new TextFlowContainer(text =>
             {
-                t.Font = OsuFont.GetFont(weight: FontWeight.Bold);
+                text.Font = OsuFont.GetFont(
+                    weight: FontWeight.Bold);
             })
             {
                 RelativeSizeAxes = Axes.X,
@@ -37,9 +40,9 @@ namespace osu.Game.Overlays.Dashboard.Home.News
             };
 
             HoverColour = colourProvider.Light1;
+            TooltipText = "read news";
 
-            TooltipText = "view in browser";
-            Action = () => host.OpenUrlExternally("https://osu.ppy.sh/home/news/" + post.Slug);
+            Action = () => newsOverlay.ShowArticle(post.Slug);
         }
     }
 }

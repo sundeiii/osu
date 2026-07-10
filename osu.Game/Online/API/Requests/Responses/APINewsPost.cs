@@ -1,11 +1,12 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// This file is partly modified by GooGuTeam.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
 
-using Newtonsoft.Json;
 using System;
 using System.Net;
+using Newtonsoft.Json;
 
 namespace osu.Game.Online.API.Requests.Responses
 {
@@ -54,6 +55,21 @@ namespace osu.Game.Online.API.Requests.Responses
         {
             get => preview;
             set => preview = WebUtility.HtmlDecode(value);
+        }
+
+        private string content;
+
+        /// <summary>
+        /// Full plain-text contents of the news article.
+        ///
+        /// This normally isn't populated by the news listing endpoint.
+        /// It is populated by GET /api/v2/news/{slug}.
+        /// </summary>
+        [JsonProperty("content")]
+        public string Content
+        {
+            get => content;
+            set => content = WebUtility.HtmlDecode(value);
         }
     }
 }
