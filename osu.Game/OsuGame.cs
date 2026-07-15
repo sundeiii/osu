@@ -53,6 +53,7 @@ using osu.Game.Online.Chat;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Online.Rooms;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Admin;
 using osu.Game.Overlays.BeatmapListing;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Mods;
@@ -143,6 +144,8 @@ namespace osu.Game
         private BeatmapListingOverlay beatmapListing;
 
         private DashboardOverlay dashboard;
+
+        private AdminOverlay adminOverlay;
 
         private NewsOverlay news;
 
@@ -1201,6 +1204,14 @@ namespace osu.Game
             loadComponentSingleFile(statisticsProvider = new LocalUserStatisticsProvider(), Add, true);
             loadComponentSingleFile(difficultyRecommender = new DifficultyRecommender(statisticsProvider), Add, true);
             loadComponentSingleFile(new UserStatisticsWatcher(statisticsProvider), Add, true);
+
+            // Cache this before Toolbar loads so ToolbarAdminButton can resolve it.
+            loadComponentSingleFile(
+                adminOverlay = new AdminOverlay(),
+                overlayContent.Add,
+                true
+            );
+
             loadComponentSingleFile(Toolbar = new Toolbar
             {
                 OnHome = delegate
@@ -1365,7 +1376,17 @@ namespace osu.Game
             }
 
             // ensure only one of these overlays are open at once.
-            var singleDisplayOverlays = new OverlayContainer[] { chatOverlay, news, dashboard, beatmapListing, changelogOverlay, rankingsOverlay, wikiOverlay };
+            var singleDisplayOverlays = new OverlayContainer[]
+            {
+                chatOverlay,
+                news,
+                dashboard,
+                adminOverlay,
+                beatmapListing,
+                changelogOverlay,
+                rankingsOverlay,
+                wikiOverlay,
+            };
 
             foreach (var overlay in singleDisplayOverlays)
             {

@@ -123,14 +123,32 @@ namespace osu.Game.Overlays.News.Sidebar
             }
         }
 
-        private partial class PostLink : LinkFlowContainer
+        private partial class PostLink : OsuClickableContainer
         {
+            private readonly APINewsPost post;
+
+            [Resolved]
+            private NewsOverlay newsOverlay { get; set; } = null!;
+
             public PostLink(APINewsPost post)
-                : base(t => t.Font = OsuFont.GetFont(size: 12))
             {
+                this.post = post;
+
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
-                AddLink(post.Title, LinkAction.External, @"/home/news/" + post.Slug, "view in browser");
+
+                TooltipText = "read news";
+                Action = () => newsOverlay.ShowArticle(post.Slug);
+
+                Child = new TextFlowContainer(text =>
+                {
+                    text.Font = OsuFont.GetFont(size: 12);
+                })
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Text = post.Title
+                };
             }
         }
 

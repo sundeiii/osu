@@ -19,6 +19,6 @@ namespace osu.Game.Online.API.Requests
             this.slug = slug;
         }
 
-        protected override string Target => $"news/{Uri.EscapeDataString(slug)}";
+        protected override string Target => $"news/{System.Uri.EscapeDataString(slug)}";
     }
 }

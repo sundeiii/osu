@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
@@ -114,9 +114,8 @@ namespace osu.Game.Audio
 
             protected override Track GetTrack()
             {
-                string previewUrl = beatmapSetInfo.OnlineID >= 1_000_000_000
-                    ? $"https://rinarii.de/preview/{beatmapSetInfo.OnlineID}.mp3"
-                    : $"https://b.ppy.sh/preview/{beatmapSetInfo.OnlineID}.mp3";
+                string previewUrl =
+                    $"https://b.rinarii.de/preview/{beatmapSetInfo.OnlineID}.mp3";
 
                 return trackManager.Get(previewUrl);
             }

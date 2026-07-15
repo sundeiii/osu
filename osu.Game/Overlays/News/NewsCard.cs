@@ -26,6 +26,9 @@ namespace osu.Game.Overlays.News
 
         private readonly APINewsPost post;
 
+        [Resolved]
+        private NewsOverlay newsOverlay { get; set; } = null!;
+
         private Box background = null!;
         private TextFlowContainer main = null!;
 
@@ -41,12 +44,12 @@ namespace osu.Game.Overlays.News
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider, OsuGame? game)
+        private void load(OverlayColourProvider colourProvider)
         {
             if (post.Slug != null)
             {
-                TooltipText = "view in browser";
-                Action = () => game?.OpenUrlExternally(@"/home/news/" + post.Slug);
+                TooltipText = "read news";
+                Action = () => newsOverlay.ShowArticle(post.Slug);
             }
 
             AddRange(new Drawable[]
@@ -144,7 +147,7 @@ namespace osu.Game.Overlays.News
                     },
                     new OsuSpriteText
                     {
-                        Text = date.ToLocalisedMediumDate().ToUpper(),
+                        Text = date.ToString("dd MMM yyyy").ToUpperInvariant(),
                         Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
                         Margin = new MarginPadding
                         {

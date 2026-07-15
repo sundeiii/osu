@@ -238,7 +238,7 @@ namespace osu.Game.Overlays
             beginLoading(true);
 
             // We do not need the year/archive sidebar while reading.
-            sidebarContainer.Hide();
+            sidebarContainer.Show();
 
             // Initially show the slug while loading.
             // It is replaced with the real title after the request succeeds.
@@ -310,7 +310,7 @@ namespace osu.Game.Overlays
                     Padding = new MarginPadding(40),
                     Children = new Drawable[]
                     {
-                        new osu.Game.Graphics.Containers.TextFlowContainer(text =>
+                        new TextFlowContainer(text =>
                         {
                             text.Font = osu.Game.Graphics.OsuFont.GetFont(
                                 size: 20,
