@@ -253,7 +253,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          shopt -s nullglob globstar
+          shopt -s nullglob
 
           echo "Files created by Velopack:"
           find Releases -maxdepth 2 -type f -print || true
@@ -273,7 +273,7 @@ jobs:
 
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             # Copy the Velopack installer.
-            for f in Releases/*.exe Releases/**/*.exe; do
+            for f in Releases/*.exe; do
               if [ -f "$f" ]; then
                 cp "$f" \
                   "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-Setup.exe"
