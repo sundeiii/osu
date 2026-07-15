@@ -78,7 +78,7 @@ namespace osu.Desktop.Updater
                 {
                     log("Update check cancelled");
                     scheduleNextUpdateCheck();
-                    return true;
+                    return false;
                 }
 
                 if (update == null)
@@ -98,9 +98,8 @@ namespace osu.Desktop.Updater
             {
                 log($"Update check failed with error ({e.Message})");
 
-                // we shouldn't crash on a web failure. or any failure for the matter.
                 scheduleNextUpdateCheck();
-                return true;
+                return false;
             }
         }
 

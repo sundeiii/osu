@@ -216,6 +216,20 @@ jobs:
         shell: bash
         run: chmod +x "publish/${{ matrix.runtime }}/${{ matrix.executable }}"
 
+      - name: Download previous Velopack release
+        shell: bash
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p Releases
+
+          vpk download github \
+            --repoUrl "https://github.com/${{ github.repository }}" \
+            --token "$GH_TOKEN" \
+            --channel "${{ matrix.channel }}" \
+            --outputDir Releases
+
       - name: Create Velopack package
         shell: bash
         run: |
@@ -239,61 +253,94 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          shopt -s nullglob
+          shopt -s nullglob globstar
 
           echo "Files created by Velopack:"
           find Releases -maxdepth 2 -type f -print || true
 
+          copy_velopack_update_files() {
+            for f in \
+              Releases/*.nupkg \
+              Releases/RELEASES* \
+              Releases/releases.*.json \
+              Releases/assets.*.json; do
+              if [ -f "$f" ]; then
+                echo "Copying Velopack update file: $f"
+                cp "$f" release-assets/
+              fi
+            done
+          }
+
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            # Copy any Velopack installer exe if it exists.
+            # Copy the Velopack installer.
             for f in Releases/*.exe Releases/**/*.exe; do
               if [ -f "$f" ]; then
-                cp "$f" "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-Setup.exe"
+                cp "$f" \
+                  "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-Setup.exe"
                 break
               fi
             done
 
-            # Also create a normal portable zip so Windows always has a downloadable build.
-            powershell -NoProfile -Command "Compress-Archive -Path 'publish/${{ matrix.runtime }}/*' -DestinationPath 'release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-portable.zip' -Force"
+            # Create a portable Windows archive.
+            powershell -NoProfile -Command \
+              "Compress-Archive -Path 'publish/${{ matrix.runtime }}/*' -DestinationPath 'release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-portable.zip' -Force"
 
-            # Keep Velopack update files too.
-            for f in Releases/*.nupkg Releases/RELEASES*; do
-              cp "$f" release-assets/
-            done
+            copy_velopack_update_files
           fi
 
           if [[ "${{ matrix.runtime }}" == "linux-x64" ]]; then
             for f in Releases/*.AppImage; do
-              cp "$f" "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-linux-x64.AppImage"
+              if [ -f "$f" ]; then
+                cp "$f" \
+                  "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-linux-x64.AppImage"
+              fi
             done
 
-            for f in Releases/*.nupkg Releases/RELEASES*; do
-              cp "$f" release-assets/
-            done
+            copy_velopack_update_files
           fi
 
           if [[ "${{ matrix.runtime }}" == "osx-x64" ]]; then
             for f in Releases/*.zip; do
-              cp "$f" "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-macos-intel.zip"
+              if [ -f "$f" ]; then
+                cp "$f" \
+                  "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-macos-intel.zip"
+              fi
             done
 
-            for f in Releases/*.nupkg Releases/RELEASES*; do
-              cp "$f" release-assets/
-            done
+            copy_velopack_update_files
           fi
 
           if [[ "${{ matrix.runtime }}" == "osx-arm64" ]]; then
             for f in Releases/*.zip; do
-              cp "$f" "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-macos-apple-silicon.zip"
+              if [ -f "$f" ]; then
+                cp "$f" \
+                  "release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-macos-apple-silicon.zip"
+              fi
             done
 
-            for f in Releases/*.nupkg Releases/RELEASES*; do
-              cp "$f" release-assets/
-            done
+            copy_velopack_update_files
           fi
 
           echo "Release assets:"
-          ls -al release-assets
+          find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Verify Velopack release assets
+        shell: bash
+        run: |
+          FEED="release-assets/releases.${{ matrix.channel }}.json"
+
+          test -f "$FEED" || {
+            echo "::error::Missing $FEED"
+            exit 1
+          }
+
+          if ! compgen -G "release-assets/*.nupkg" > /dev/null; then
+            echo "::error::No Velopack package was copied"
+            exit 1
+          fi
+
+          echo "Verified Velopack assets:"
+          ls -lh release-assets
 
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4

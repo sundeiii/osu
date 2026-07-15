@@ -25,10 +25,18 @@ namespace osu.Game.Updater
 
         private string version = string.Empty;
 
+        private static string normaliseVersion(string value)
+        {
+            return value
+                .Split('-')
+                .First()
+                .TrimStart('v', 'V');
+        }
+
         [BackgroundDependencyLoader]
         private void load(OsuGameBase game)
         {
-            version = game.Version.Split('-').First();
+            version = normaliseVersion(game.Version);
         }
 
         protected override async Task<bool> PerformUpdateCheck(CancellationToken cancellationToken)
@@ -40,14 +48,13 @@ namespace osu.Game.Updater
 
                 OsuJsonWebRequest<GitHubRelease[]> releasesRequest = new OsuJsonWebRequest<GitHubRelease[]>("https://api.github.com/repos/sundeiii/osu/releases?per_page=10&page=1");
                 await releasesRequest.PerformAsync(cancellationToken).ConfigureAwait(false);
-
                 GitHubRelease[] releases = releasesRequest.ResponseObject;
                 GitHubRelease? latest = releases.OrderByDescending(r => r.PublishedAt).FirstOrDefault(r => includePrerelease || !r.Prerelease);
 
                 if (latest == null)
                     return false;
 
-                string latestTagName = latest.TagName.Split('-').First();
+                string latestTagName = normaliseVersion(latest.TagName);
 
                 if (latestTagName != version)
                 {
@@ -61,8 +68,7 @@ namespace osu.Game.Updater
             }
             catch
             {
-                // we shouldn't crash on a web failure. or any failure for the matter.
-                return true;
+                return false;
             }
 
             return false;
