@@ -9,6 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input;
+using osu.Framework.Input.StateChanges;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Input.Handlers;
@@ -92,6 +93,7 @@ namespace osu.Game.Rulesets.Osu.UI
             base.Update();
 
             updateAnarchyRelax();
+            updateAnarchyAimAssist();
         }
 
         private void updateAnarchyRelax()
@@ -214,6 +216,81 @@ namespace osu.Game.Rulesets.Osu.UI
                     circle.HitObject.HitWindows.CanBeHit(
                         time - circle.HitObject.StartTime);
             }
+        }
+
+        private void updateAnarchyAimAssist()
+        {
+            if (!AnarchySettingsState.AimAssist)
+                return;
+
+            if (KeyBindingInputManager.ReplayInputHandler != null)
+                return;
+
+            double time = Playfield.Clock.CurrentTime;
+
+            DrawableOsuHitObject? target =
+                Playfield.HitObjectContainer.AliveObjects
+                         .OfType<DrawableOsuHitObject>()
+                         .Where(drawable => !drawable.IsHit)
+                         .Where(drawable => drawable is not DrawableSpinner)
+                         .Where(drawable => AnarchySettingsState.AimAssistOnSliders || drawable is not DrawableSlider)
+                         .Where(drawable => time <= getEndTime(drawable))
+                         .OrderBy(drawable => drawable.HitObject.StartTime)
+                         .FirstOrDefault();
+
+            if (target == null)
+                return;
+
+            if (target.HitObject.StartTime - time > 240)
+                return;
+
+            Vector2 cursorPosition =
+                Playfield.ToLocalSpace(
+                    KeyBindingInputManager.CurrentState.Mouse.Position);
+
+            Vector2 targetPosition = Playfield.ToLocalSpace(target.ScreenSpaceDrawQuad.Centre);
+
+            float distance = Vector2.Distance(cursorPosition, targetPosition);
+
+            int startingDistance = AnarchySettingsState.AimAssistStartingDistance.Value;
+            int stoppingDistance = AnarchySettingsState.AimAssistStoppingDistance.Value;
+            int speed = AnarchySettingsState.AimAssistSpeed.Value;
+
+            if (distance > startingDistance)
+                return;
+
+            float stopRadius = 64f * stoppingDistance / 100f;
+
+            if (distance <= stopRadius)
+                return;
+
+            Vector2 delta = targetPosition - cursorPosition;
+
+            if (delta.LengthSquared <= 0)
+                return;
+
+            float step =
+                Math.Clamp(
+                    distance / (5f - speed / 10f) / 10f,
+                    0f,
+                    5f);
+
+            Vector2 nextPosition =
+                cursorPosition +
+                Vector2.Normalize(delta) *
+                Math.Min(step * 4f, distance);
+
+            new MousePositionAbsoluteInput
+            {
+                Position = Playfield.ToScreenSpace(nextPosition)
+            }.Apply(
+                KeyBindingInputManager.CurrentState,
+                KeyBindingInputManager);
+
+            static double getEndTime(DrawableOsuHitObject drawable)
+                => drawable.HitObject is IHasDuration duration
+                    ? duration.EndTime
+                    : drawable.HitObject.StartTime;
         }
 
         private void enableAnarchyRelax()

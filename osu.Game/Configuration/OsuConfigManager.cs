@@ -208,6 +208,12 @@ namespace osu.Game.Configuration
                 11.0,
                 0.1);
 
+
+            SetDefault(OsuSetting.AnarchyAimAssist, false);
+            SetDefault(OsuSetting.AnarchyAimAssistSpeed, 5, 1, 11);
+            SetDefault(OsuSetting.AnarchyAimAssistStartingDistance, 66, 0, 300);
+            SetDefault(OsuSetting.AnarchyAimAssistStoppingDistance, 30, 0, 66);
+            SetDefault(OsuSetting.AnarchyAimAssistOnSliders, false);
             // Initialise the runtime state from saved config values,
             // and keep it synchronised if config changes.
             GetBindable<bool>(OsuSetting.AnarchyRelax).BindValueChanged(
@@ -224,6 +230,26 @@ namespace osu.Game.Configuration
 
             GetBindable<double>(OsuSetting.AnarchyApproachRate).BindValueChanged(
                 change => AnarchySettingsState.ApproachRate = change.NewValue,
+                true);
+
+            GetBindable<bool>(OsuSetting.AnarchyAimAssist).BindValueChanged(
+                change => AnarchySettingsState.AimAssist = change.NewValue,
+                true);
+
+            GetBindable<int>(OsuSetting.AnarchyAimAssistSpeed).BindValueChanged(
+                change => AnarchySettingsState.AimAssistSpeed.Value = change.NewValue,
+                true);
+
+            GetBindable<int>(OsuSetting.AnarchyAimAssistStartingDistance).BindValueChanged(
+                change => AnarchySettingsState.AimAssistStartingDistance.Value = change.NewValue,
+                true);
+
+            GetBindable<int>(OsuSetting.AnarchyAimAssistStoppingDistance).BindValueChanged(
+                change => AnarchySettingsState.AimAssistStoppingDistance.Value = change.NewValue,
+                true);
+
+            GetBindable<bool>(OsuSetting.AnarchyAimAssistOnSliders).BindValueChanged(
+                change => AnarchySettingsState.AimAssistOnSliders = change.NewValue,
                 true);
 
             // Update
@@ -373,6 +399,8 @@ namespace osu.Game.Configuration
                             GlobalActionKeyBindingStrings.RandomSkin,
                             LookupKeyBindings(GlobalAction.RandomSkin))
                     );
+
+
                 }),
                 new TrackedSetting<float>(OsuSetting.UIScale, scale => new SettingDescription(
                         rawValue: scale,
@@ -492,6 +520,11 @@ namespace osu.Game.Configuration
         AnarchyTimewarpRate,
         AnarchyApproachRateEnabled,
         AnarchyApproachRate,
+        AnarchyAimAssist,
+        AnarchyAimAssistSpeed,
+        AnarchyAimAssistStartingDistance,
+        AnarchyAimAssistStoppingDistance,
+        AnarchyAimAssistOnSliders,
         Scaling,
         ScalingPositionX,
         ScalingPositionY,

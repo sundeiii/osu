@@ -29,6 +29,10 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 "rate",
                 "approach rate",
                 "ar",
+                "aim assist",
+                "aim assistance",
+                "osu buddy",
+                "osubuddy",
             });
 
         [BackgroundDependencyLoader]
@@ -40,7 +44,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
             Bindable<bool> removeHidden =
                 config.GetBindable<bool>(OsuSetting.AnarchyRemoveHidden);
 
-           Bindable<bool> timewarpEnabled =
+            Bindable<bool> timewarpEnabled =
                 config.GetBindable<bool>(OsuSetting.AnarchyTimewarpEnabled);
 
             Bindable<double> timewarpRate =
@@ -51,6 +55,21 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
 
             Bindable<double> approachRate =
                 config.GetBindable<double>(OsuSetting.AnarchyApproachRate);
+
+            Bindable<bool> aimAssist =
+                config.GetBindable<bool>(OsuSetting.AnarchyAimAssist);
+
+            Bindable<int> aimAssistSpeed =
+                config.GetBindable<int>(OsuSetting.AnarchyAimAssistSpeed);
+
+            Bindable<int> aimAssistStartingDistance =
+                config.GetBindable<int>(OsuSetting.AnarchyAimAssistStartingDistance);
+
+            Bindable<int> aimAssistStoppingDistance =
+                config.GetBindable<int>(OsuSetting.AnarchyAimAssistStoppingDistance);
+
+            Bindable<bool> aimAssistOnSliders =
+                config.GetBindable<bool>(OsuSetting.AnarchyAimAssistOnSliders);
 
             timewarpEnabled.BindValueChanged(
                 change => AnarchySettingsState.TimewarpEnabled = change.NewValue,
@@ -74,6 +93,26 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
 
             removeHidden.BindValueChanged(
                 change => AnarchySettingsState.RemoveHidden = change.NewValue,
+                true);
+
+            aimAssist.BindValueChanged(
+                change => AnarchySettingsState.AimAssist = change.NewValue,
+                true);
+
+            aimAssistSpeed.BindValueChanged(
+                change => AnarchySettingsState.AimAssistSpeed.Value = change.NewValue,
+                true);
+
+            aimAssistStartingDistance.BindValueChanged(
+                change => AnarchySettingsState.AimAssistStartingDistance.Value = change.NewValue,
+                true);
+
+            aimAssistStoppingDistance.BindValueChanged(
+                change => AnarchySettingsState.AimAssistStoppingDistance.Value = change.NewValue,
+                true);
+
+            aimAssistOnSliders.BindValueChanged(
+                change => AnarchySettingsState.AimAssistOnSliders = change.NewValue,
                 true);
 
             Children = new Drawable[]
@@ -116,6 +155,42 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = approachRate,
                     KeyboardStep = 0.1f,
                     LabelFormat = v => $"AR {v:0.0}",
+                }),
+
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Aim assist",
+                    Current = aimAssist,
+                }),
+
+                new SettingsItemV2(new FormSliderBar<int>
+                {
+                    Caption = "Aim assist speed",
+                    Current = aimAssistSpeed,
+                    KeyboardStep = 1,
+                    LabelFormat = v => $"{v}",
+                }),
+
+                new SettingsItemV2(new FormSliderBar<int>
+                {
+                    Caption = "Aim assist starting distance",
+                    Current = aimAssistStartingDistance,
+                    KeyboardStep = 1,
+                    LabelFormat = v => $"{v}px",
+                }),
+
+                new SettingsItemV2(new FormSliderBar<int>
+                {
+                    Caption = "Aim assist stopping distance",
+                    Current = aimAssistStoppingDistance,
+                    KeyboardStep = 1,
+                    LabelFormat = v => $"{v}%",
+                }),
+
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Aim assist on sliders",
+                    Current = aimAssistOnSliders,
                 }),
             };
         }

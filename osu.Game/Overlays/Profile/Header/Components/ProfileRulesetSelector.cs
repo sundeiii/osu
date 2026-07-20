@@ -24,9 +24,13 @@ namespace osu.Game.Overlays.Profile.Header.Components
             base.LoadComplete();
 
             User.BindValueChanged(user => updateState(user.NewValue), true);
+
             Current.BindValueChanged(ruleset =>
             {
-                if (User.Value != null && !ruleset.NewValue.Equals(User.Value.Ruleset))
+                if (User.Value == null || ruleset.NewValue == null)
+                    return;
+
+                if (User.Value.Ruleset == null || !ruleset.NewValue.Equals(User.Value.Ruleset))
                     profileOverlay?.ShowUser(User.Value.User, ruleset.NewValue);
             });
         }
@@ -59,8 +63,19 @@ namespace osu.Game.Overlays.Profile.Header.Components
 
         private void updateState(UserProfileData? user)
         {
-            Current.Value = getItemsWithSpecialRulesets().SingleOrDefault(ruleset => user?.Ruleset.MatchesOnlineID(ruleset) == true);
-            SetDefaultRuleset(Rulesets.GetRuleset(user?.User.PlayMode ?? @"osu").AsNonNull());
+            if (user == null)
+            {
+                Current.Value = null;
+                return;
+            }
+
+            Current.Value = getItemsWithSpecialRulesets()
+                            .SingleOrDefault(ruleset => user.Ruleset != null && user.Ruleset.MatchesOnlineID(ruleset));
+
+            var defaultRuleset = Rulesets.GetRuleset(user.User.PlayMode ?? @"osu");
+
+            if (defaultRuleset != null)
+                SetDefaultRuleset(defaultRuleset);
         }
 
         public void SetDefaultRuleset(RulesetInfo ruleset)

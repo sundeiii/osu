@@ -24,5 +24,30 @@ namespace osu.Game.Configuration
         public static bool ApproachRateEnabled { get; set; }
 
         public static double ApproachRate { get; set; } = 9.0;
+
+        public static bool AimAssist { get; set; }
+
+        public static BindableInt AimAssistSpeed { get; } =
+            new BindableInt(5)
+            {
+                MinValue = 1,
+                MaxValue = 11,
+            };
+
+        public static BindableInt AimAssistStartingDistance { get; } =
+            new BindableInt(66)
+            {
+                MinValue = 0,
+                MaxValue = 300,
+            };
+
+        public static BindableInt AimAssistStoppingDistance { get; } =
+            new BindableInt(30)
+            {
+                MinValue = 0,
+                MaxValue = 66,
+            };
+
+        public static bool AimAssistOnSliders { get; set; }
     }
 }
