@@ -138,7 +138,7 @@ namespace osu.Game.Rulesets.Osu.Difficulty.Evaluators
                         }
 
                         // scale down the difficulty if the object is doubletappable
-                        double doubletapness = prevObj.GetDoubletapness(currObj);
+                        double doubletapness = prevObj.CalculateDoubleTapFeasibility(currObj);
                         effectiveRatio *= 1 - doubletapness * 0.75;
 
                         rhythmComplexitySum += Math.Sqrt(effectiveRatio * startRatio) * currHistoricalDecay;
@@ -177,7 +177,7 @@ namespace osu.Game.Rulesets.Osu.Difficulty.Evaluators
             }
 
             double rhythmDifficulty = Math.Sqrt(4 + rhythmComplexitySum * rhythm_overall_multiplier) / 2.0; // produces multiplier that can be applied to strain. range [1, infinity) (not really though)
-            rhythmDifficulty *= 1 - currentOsuObject.GetDoubletapness((OsuDifficultyHitObject)current.Next(0));
+            rhythmDifficulty *= 1 - currentOsuObject.CalculateDoubleTapFeasibility((OsuDifficultyHitObject?)current.Next(0));
 
             return rhythmDifficulty;
         }
@@ -232,3 +232,5 @@ namespace osu.Game.Rulesets.Osu.Difficulty.Evaluators
         }
     }
 }
+
+

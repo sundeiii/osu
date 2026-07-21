@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
@@ -20,6 +20,11 @@ namespace osu.Game.Rulesets.Difficulty.Skills
         /// </summary>
         protected IReadOnlyList<Mod> Mods => mods;
 
+        /// <summary>
+        /// List of calculated per-object difficulties, populated by Process
+        /// </summary>
+        protected readonly List<double> ObjectDifficulties = new List<double>();
+
         private readonly Mod[] mods;
 
         protected Skill(Mod[] mods)
@@ -31,11 +36,19 @@ namespace osu.Game.Rulesets.Difficulty.Skills
         /// Process a <see cref="DifficultyHitObject"/>.
         /// </summary>
         /// <param name="current">The <see cref="DifficultyHitObject"/> to process.</param>
-        public abstract void Process(DifficultyHitObject current);
+        public void Process(DifficultyHitObject current)
+        {
+            double difficultyValue = ProcessInternal(current);
+            ObjectDifficulties.Add(difficultyValue);
+        }
+
+        protected abstract double ProcessInternal(DifficultyHitObject current);
 
         /// <summary>
         /// Returns the calculated difficulty value representing all <see cref="DifficultyHitObject"/>s that have been processed up to this point.
         /// </summary>
         public abstract double DifficultyValue();
+
+        public IReadOnlyList<double> GetObjectDifficulties() => ObjectDifficulties;
     }
 }

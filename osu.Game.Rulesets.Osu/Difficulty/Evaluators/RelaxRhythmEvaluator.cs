@@ -104,7 +104,7 @@ namespace osu.Game.Rulesets.Osu.Difficulty.Evaluators
                             islandCounts.Add(new IslandCount(island));
                         }
 
-                        double doubletapness = previous.GetDoubletapness(currObj);
+                        double doubletapness = previous.CalculateDoubleTapFeasibility(currObj);
                         effectiveRatio *= 1.0 - doubletapness * 0.75;
 
                         rhythmComplexitySum += Math.Sqrt(effectiveRatio * startRatio) * currHistoricalDecay;
@@ -194,3 +194,4 @@ namespace osu.Game.Rulesets.Osu.Difficulty.Evaluators
         }
     }
 }
+
