@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
@@ -20,6 +20,9 @@ namespace osu.Game.Rulesets.Osu.Difficulty
 
         [JsonProperty("flashlight")]
         public double Flashlight { get; set; }
+
+        [JsonProperty("reading")]
+        public double Reading { get; set; }
 
         [JsonProperty("effective_miss_count")]
         public double EffectiveMissCount { get; set; }
@@ -48,6 +51,7 @@ namespace osu.Game.Rulesets.Osu.Difficulty
             yield return new PerformanceDisplayAttribute(nameof(Speed), "Speed", Speed);
             yield return new PerformanceDisplayAttribute(nameof(Accuracy), "Accuracy", Accuracy);
             yield return new PerformanceDisplayAttribute(nameof(Flashlight), "Flashlight Bonus", Flashlight);
+            yield return new PerformanceDisplayAttribute(nameof(Reading), "Reading", Reading);
         }
     }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -317,6 +317,14 @@ namespace osu.Game.Beatmaps.Formats
                     beatmap.Bookmarks = pair.Value.Split(',').Select(v =>
                     {
                         bool result = int.TryParse(v, out int val);
+                        return new { result, val };
+                    }).Where(p => p.result).Select(p => p.val).ToArray();
+                    break;
+
+                case @"VelocityPresets":
+                    beatmap.SliderVelocityPresets = pair.Value.Split(',').Select(v =>
+                    {
+                        bool result = double.TryParse(v, out double val);
                         return new { result, val };
                     }).Where(p => p.result).Select(p => p.val).ToArray();
                     break;
