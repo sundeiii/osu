@@ -13,6 +13,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Online.API;
+using osu.Game.Online.API.Requests.Responses.Admin;
 using osuTK.Graphics;
 
 namespace osu.Game.Overlays.Admin
@@ -28,12 +29,14 @@ namespace osu.Game.Overlays.Admin
         private FillFlowContainer reportsFlow;
         private FillFlowContainer scoresFlow;
         private FillFlowContainer beatmapsFlow;
+        private FillFlowContainer newsFlow;
         private FillFlowContainer auditLogFlow;
 
         private OsuSpriteText reportsStatusText;
         private OsuSpriteText scoresStatusText;
         private OsuSpriteText systemStatusText;
         private OsuSpriteText beatmapsStatusText;
+        private OsuSpriteText newsStatusText;
         private OsuSpriteText auditLogStatusText;
         private OsuSpriteText usersStatusText;
 
@@ -42,6 +45,14 @@ namespace osu.Game.Overlays.Admin
         private OsuTextBox scoresSearchBox;
         private OsuTextBox beatmapsSearchBox;
         private OsuTextBox auditLogSearchBox;
+
+        private OsuTextBox newsTitleBox;
+        private OsuTextBox newsSlugBox;
+        private OsuTextBox newsAuthorBox;
+        private OsuTextBox newsPreviewBox;
+        private OsuTextBox newsImageBox;
+        private OsuTextBox newsPublishedAtBox;
+        private OsuTextBox newsContentBox;
 
         private Container systemSummaryContainer;
         private FillFlowContainer systemServicesFlow;
@@ -84,6 +95,8 @@ namespace osu.Game.Overlays.Admin
         private OsuSpriteText auditLogPageText;
 
         private AdminOverlayTab currentPage;
+
+        private APIAdminNewsPost selectedNewsPost;
 
         public AdminOverlay()
             : base(OverlayColourScheme.Purple)
@@ -132,6 +145,10 @@ namespace osu.Game.Overlays.Admin
                 case AdminOverlayTab.Reports:
                     display = createReportsPage();
                     reportsSearchBox.OnCommit += (_, _) => loadReports();
+                    break;
+
+                case AdminOverlayTab.News:
+                    display = createNewsPage();
                     break;
 
                 case AdminOverlayTab.System:
@@ -371,7 +388,11 @@ namespace osu.Game.Overlays.Admin
                 case AdminOverlayTab.Reports:
                     loadReports();
                     break;
-
+                
+                case AdminOverlayTab.News:
+                    loadNews();
+                    break;
+                
                 case AdminOverlayTab.System:
                     loadSystemStatus();
                     break;

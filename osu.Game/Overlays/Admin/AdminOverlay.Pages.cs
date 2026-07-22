@@ -112,6 +112,206 @@ namespace osu.Game.Overlays.Admin
             };
         }
 
+        private FillFlowContainer createNewsPage()
+        {
+            return new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 18),
+                Children = new Drawable[]
+                {
+                    createSectionHeading(
+                        "news",
+                        "Create, edit and delete lazer client news posts."),
+
+                    new GridContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = 520,
+                        ColumnDimensions = new[]
+                        {
+                            new Dimension(),
+                            new Dimension(GridSizeMode.Absolute, 18),
+                            new Dimension(),
+                        },
+                        Content = new[]
+                        {
+                            new Drawable[]
+                            {
+                                createNewsEditor(),
+                                Empty(),
+                                new FillFlowContainer
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Direction = FillDirection.Vertical,
+                                    Spacing = new Vector2(0, 8),
+                                    Children = new Drawable[]
+                                    {
+                                        newsStatusText = createStatusText(
+                                            "news posts have not been loaded"),
+
+                                        new RoundedButton
+                                        {
+                                            Width = 140,
+                                            Height = 38,
+                                            Text = "new post",
+                                            BackgroundColour = colours.Purple3,
+                                            Action = clearNewsEditor,
+                                        },
+
+                                        newsFlow = createVerticalResultsFlow(),
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+        }
+
+        private Drawable createNewsEditor()
+        {
+            return new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Masking = true,
+                CornerRadius = 12,
+                Children = new Drawable[]
+                {
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = OsuColour.Gray(18),
+                    },
+                    new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Padding = new MarginPadding(14),
+                        Spacing = new Vector2(0, 8),
+                        Children = new Drawable[]
+                        {
+                            createNewsTextBox(
+                                "title",
+                                newsTitleBox = new OsuTextBox
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 36,
+                                    PlaceholderText = "Welcome to rinari!lazer",
+                                }),
+
+                            createNewsTextBox(
+                                "slug",
+                                newsSlugBox = new OsuTextBox
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 36,
+                                    PlaceholderText = "welcome-to-rinari-lazer",
+                                }),
+
+                            createNewsTextBox(
+                                "author",
+                                newsAuthorBox = new OsuTextBox
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 36,
+                                    PlaceholderText = "Frankie",
+                                }),
+
+                            createNewsTextBox(
+                                "preview",
+                                newsPreviewBox = new OsuTextBox
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 36,
+                                    PlaceholderText = "Short preview shown in the news list",
+                                }),
+
+                            createNewsTextBox(
+                                "image url",
+                                newsImageBox = new OsuTextBox
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 36,
+                                    PlaceholderText = "optional first image URL",
+                                }),
+
+                            createNewsTextBox(
+                                "published at",
+                                newsPublishedAtBox = new OsuTextBox
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 36,
+                                    PlaceholderText = "optional, empty = now",
+                                }),
+
+                            createNewsTextBox(
+                                "content",
+                                newsContentBox = new OsuTextBox
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 92,
+                                    PlaceholderText = "Full news post content",
+                                }),
+
+                            new FillFlowContainer
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                AutoSizeAxes = Axes.Y,
+                                Direction = FillDirection.Horizontal,
+                                Spacing = new Vector2(8, 0),
+                                Children = new Drawable[]
+                                {
+                                    new RoundedButton
+                                    {
+                                        Width = 130,
+                                        Height = 38,
+                                        Text = "save",
+                                        BackgroundColour = colours.Green3,
+                                        Action = saveNewsPost,
+                                    },
+                                    new RoundedButton
+                                    {
+                                        Width = 130,
+                                        Height = 38,
+                                        Text = "clear",
+                                        BackgroundColour = colours.Gray5,
+                                        Action = clearNewsEditor,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+        }
+
+        private Drawable createNewsTextBox(string label, OsuTextBox textBox)
+        {
+            return new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 2),
+                Children = new Drawable[]
+                {
+                    new OsuSpriteText
+                    {
+                        Text = label,
+                        Font = OsuFont.GetFont(
+                            size: 11,
+                            weight: FontWeight.Bold),
+                        Colour = colours.GrayB,
+                    },
+                    textBox,
+                },
+            };
+        }
+
         private FillFlowContainer createScoresPage()
         {
             return new FillFlowContainer

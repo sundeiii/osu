@@ -4,11 +4,13 @@
 
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Admin;
 using osu.Game.Online.API.Requests.Responses.Admin;
 
@@ -25,6 +27,204 @@ namespace osu.Game.Overlays.Admin
                 "No reports loaded",
                 "Connect this page to /api/admin/reports.",
                 colours.Orange3));
+        }
+
+        private void loadNews()
+        {
+            Loading.Show();
+            newsStatusText.Text = "loading news posts...";
+
+            var request = new GetAdminNewsRequest();
+
+            request.Success += posts =>
+            {
+                newsFlow.Clear();
+
+                if (posts.Count == 0)
+                {
+                    newsFlow.Add(createEmptyState(
+                        "No news posts",
+                        "Create a new lazer client news post using the editor.",
+                        colours.Purple3));
+                }
+                else
+                {
+                    foreach (APIAdminNewsPost post in posts)
+                        newsFlow.Add(new AdminNewsPostRow(
+                            post,
+                            selectNewsPost,
+                            deleteNewsPost));
+                }
+
+                newsStatusText.Text = posts.Count == 1
+                    ? "1 news post"
+                    : $"{posts.Count:N0} news posts";
+
+                Loading.Hide();
+            };
+
+            request.Failure += error =>
+            {
+                Loading.Hide();
+                newsStatusText.Text = $"Could not load news posts: {error.Message}";
+            };
+
+            _ = api.PerformAsync(request);
+        }
+
+        private void selectNewsPost(APIAdminNewsPost post)
+        {
+            selectedNewsPost = post;
+
+            newsTitleBox.Text = post.Title;
+            newsSlugBox.Text = post.Slug;
+            newsAuthorBox.Text = post.Author;
+            newsPreviewBox.Text = post.Preview;
+            newsImageBox.Text = post.FirstImage ?? string.Empty;
+            newsContentBox.Text = post.Content ?? string.Empty;
+            newsPublishedAtBox.Text = post.PublishedAt
+                .ToLocalTime()
+                .ToString("yyyy-MM-dd HH:mm:ss");
+
+            newsStatusText.Text = $"editing news post #{post.Id}";
+        }
+
+        private void clearNewsEditor()
+        {
+            selectedNewsPost = null;
+
+            newsTitleBox.Text = string.Empty;
+            newsSlugBox.Text = string.Empty;
+            newsAuthorBox.Text = api.LocalUser.Value.Username;
+            newsPreviewBox.Text = string.Empty;
+            newsImageBox.Text = string.Empty;
+            newsPublishedAtBox.Text = string.Empty;
+            newsContentBox.Text = string.Empty;
+
+            newsStatusText.Text = "creating new news post";
+        }
+
+        private void saveNewsPost()
+        {
+            if (string.IsNullOrWhiteSpace(newsTitleBox.Text))
+            {
+                newsStatusText.Text = "title is required";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(newsSlugBox.Text))
+                newsSlugBox.Text = slugify(newsTitleBox.Text);
+
+            if (string.IsNullOrWhiteSpace(newsAuthorBox.Text))
+                newsAuthorBox.Text = api.LocalUser.Value.Username;
+
+            if (string.IsNullOrWhiteSpace(newsPreviewBox.Text))
+            {
+                newsStatusText.Text = "preview is required";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(newsContentBox.Text))
+            {
+                newsStatusText.Text = "content is required";
+                return;
+            }
+
+            AdminNewsPostPayload payload = createNewsPayload();
+
+            APIRequest<APIAdminNewsPost> request = selectedNewsPost == null
+                ? new CreateAdminNewsPostRequest(payload)
+                : new UpdateAdminNewsPostRequest(selectedNewsPost.Id, payload);
+
+            Loading.Show();
+            newsStatusText.Text = selectedNewsPost == null
+                ? "creating news post..."
+                : $"updating news post #{selectedNewsPost.Id}...";
+
+            request.Success += post =>
+            {
+                Loading.Hide();
+
+                selectedNewsPost = post;
+
+                newsStatusText.Text = $"saved news post #{post.Id}";
+                loadNews();
+            };
+
+            request.Failure += error =>
+            {
+                Loading.Hide();
+                newsStatusText.Text = $"Could not save news post: {error.Message}";
+            };
+
+            _ = api.PerformAsync(request);
+        }
+
+        private AdminNewsPostPayload createNewsPayload()
+        {
+            DateTimeOffset? publishedAt = null;
+
+            if (!string.IsNullOrWhiteSpace(newsPublishedAtBox.Text)
+                && DateTimeOffset.TryParse(
+                    newsPublishedAtBox.Text,
+                    out DateTimeOffset parsed))
+            {
+                publishedAt = parsed;
+            }
+
+            return new AdminNewsPostPayload
+            {
+                Author = newsAuthorBox.Text.Trim(),
+                FirstImage = string.IsNullOrWhiteSpace(newsImageBox.Text)
+                    ? null
+                    : newsImageBox.Text.Trim(),
+                Slug = newsSlugBox.Text.Trim(),
+                Title = newsTitleBox.Text.Trim(),
+                Preview = newsPreviewBox.Text.Trim(),
+                Content = newsContentBox.Text,
+                PublishedAt = publishedAt,
+            };
+        }
+
+        private void deleteNewsPost(APIAdminNewsPost post)
+        {
+            Loading.Show();
+            newsStatusText.Text = $"deleting news post #{post.Id}...";
+
+            var request = new DeleteAdminNewsPostRequest(post.Id);
+
+            request.Success += () =>
+            {
+                Loading.Hide();
+
+                if (selectedNewsPost?.Id == post.Id)
+                    clearNewsEditor();
+
+                newsStatusText.Text = $"deleted news post #{post.Id}";
+                loadNews();
+            };
+
+            request.Failure += error =>
+            {
+                Loading.Hide();
+                newsStatusText.Text = $"Could not delete news post: {error.Message}";
+            };
+
+            _ = api.PerformAsync(request);
+        }
+
+        private static string slugify(string text)
+        {
+            string slug = text
+                .Trim()
+                .ToLowerInvariant();
+
+            slug = Regex.Replace(slug, @"[^a-z0-9]+", "-");
+            slug = Regex.Replace(slug, @"^-+|-+$", "");
+
+            return string.IsNullOrWhiteSpace(slug)
+                ? "news-post"
+                : slug;
         }
 
         private void loadScores()

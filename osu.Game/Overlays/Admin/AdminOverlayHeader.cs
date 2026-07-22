@@ -31,6 +31,7 @@ namespace osu.Game.Overlays.Admin
         Scores,
         Beatmaps,
         Reports,
+        News,
         System,
         AuditLog,
     }

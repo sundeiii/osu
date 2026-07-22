@@ -958,6 +958,135 @@ namespace osu.Game.Overlays.Admin
 
         }
 
+        private partial class AdminNewsPostRow : CompositeDrawable
+        {
+            private readonly APIAdminNewsPost post;
+            private readonly Action<APIAdminNewsPost> edit;
+            private readonly Action<APIAdminNewsPost> delete;
+
+            public AdminNewsPostRow(
+                APIAdminNewsPost post,
+                Action<APIAdminNewsPost> edit,
+                Action<APIAdminNewsPost> delete)
+            {
+                this.post = post;
+                this.edit = edit;
+                this.delete = delete;
+
+                RelativeSizeAxes = Axes.X;
+                Height = 104;
+                Masking = true;
+                CornerRadius = 10;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OsuColour colours)
+            {
+                string published = post.PublishedAt
+                    .ToLocalTime()
+                    .ToString("dd MMM yyyy, HH:mm");
+
+                InternalChildren = new Drawable[]
+                {
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = OsuColour.Gray(16),
+                    },
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Y,
+                        Width = 5,
+                        Colour = colours.Purple3,
+                    },
+                    new GridContainer
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Padding = new MarginPadding
+                        {
+                            Left = 16,
+                            Right = 14,
+                            Vertical = 10,
+                        },
+                        ColumnDimensions = new[]
+                        {
+                            new Dimension(),
+                            new Dimension(GridSizeMode.Absolute, 190),
+                        },
+                        Content = new[]
+                        {
+                            new Drawable[]
+                            {
+                                new FillFlowContainer
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Direction = FillDirection.Vertical,
+                                    Spacing = new Vector2(0, 3),
+                                    Children = new Drawable[]
+                                    {
+                                        new OsuSpriteText
+                                        {
+                                            Text = post.Title,
+                                            Font = OsuFont.GetFont(
+                                                size: 15,
+                                                weight: FontWeight.Bold),
+                                        },
+                                        new TruncatingSpriteText
+                                        {
+                                            RelativeSizeAxes = Axes.X,
+                                            Text = post.Preview,
+                                            Font = OsuFont.GetFont(size: 11),
+                                            Colour = colours.GrayB,
+                                        },
+                                        new OsuSpriteText
+                                        {
+                                            Text =
+                                                $"#{post.Id} · {post.Slug} · {post.Author}",
+                                            Font = OsuFont.GetFont(size: 9),
+                                            Colour = colours.Gray9,
+                                        },
+                                        new OsuSpriteText
+                                        {
+                                            Text = $"published {published}",
+                                            Font = OsuFont.GetFont(size: 9),
+                                            Colour = colours.Gray9,
+                                        },
+                                    },
+                                },
+                                new FillFlowContainer
+                                {
+                                    AutoSizeAxes = Axes.Both,
+                                    Anchor = Anchor.CentreRight,
+                                    Origin = Anchor.CentreRight,
+                                    Direction = FillDirection.Horizontal,
+                                    Spacing = new Vector2(6, 0),
+                                    Children = new Drawable[]
+                                    {
+                                        new RoundedButton
+                                        {
+                                            Width = 82,
+                                            Height = 34,
+                                            Text = "edit",
+                                            BackgroundColour = colours.Blue3,
+                                            Action = () => edit(post),
+                                        },
+                                        new RoundedButton
+                                        {
+                                            Width = 82,
+                                            Height = 34,
+                                            Text = "delete",
+                                            BackgroundColour = colours.Red3,
+                                            Action = () => delete(post),
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                };
+            }
+        }
+
         private partial class AdminAuditLogRow : CompositeDrawable
         {
             private readonly APIAdminAuditLogEntry entry;
