@@ -159,14 +159,6 @@ jobs:
           rm -rf publish/${{ matrix.runtime }}
           rm -rf Releases
 
-      - name: Restore dependencies
-        shell: bash
-        run: |
-          dotnet restore osu.Desktop/osu.Desktop.csproj \
-            -p:TargetFramework=${{ matrix.framework }} \
-            -p:RuntimeIdentifier=${{ matrix.runtime }} \
-            --verbosity normal
-
       - name: Create macOS icon
         if: matrix.os == 'macos-latest'
         shell: bash
@@ -214,7 +206,6 @@ jobs:
             --runtime ${{ matrix.runtime }} \
             --self-contained true \
             --output "publish/${{ matrix.runtime }}" \
-            --no-restore \
             --verbosity normal \
             -p:PublishSingleFile=false \
             -p:PublishTrimmed=false \
@@ -286,7 +277,6 @@ jobs:
           }
 
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            # Copy the Velopack installer.
             for f in Releases/*.exe; do
               if [ -f "$f" ]; then
                 cp "$f" \
@@ -295,7 +285,6 @@ jobs:
               fi
             done
 
-            # Create a portable Windows archive.
             powershell -NoProfile -Command \
               "Compress-Archive -Path 'publish/${{ matrix.runtime }}/*' -DestinationPath 'release-assets/Rinari-Lazer-${{ needs.version.outputs.cleanVersion }}-win-x64-portable.zip' -Force"
 
