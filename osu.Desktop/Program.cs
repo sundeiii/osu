@@ -38,112 +38,127 @@ namespace osu.Desktop
             // last time has been fixed, let's not tempt fate.
             setupVelopack(args);
 
-            if (OperatingSystem.IsWindows())
-            {
-                var windowsVersion = Environment.OSVersion.Version;
+            SentryConfig.Initialise();
 
-                // While .NET 8 only supports Windows 10 and above, running on Windows 7/8.1 may still work. We are limited by realm currently, as they choose to only support 8.1 and higher.
-                // See https://www.mongodb.com/docs/realm/sdk/dotnet/compatibility/
-                if (windowsVersion.Major < 6 || (windowsVersion.Major == 6 && windowsVersion.Minor <= 2))
+            try
+            {
+                if (OperatingSystem.IsWindows())
                 {
-                    unsafe
+                    var windowsVersion = Environment.OSVersion.Version;
+
+                    // While .NET 8 only supports Windows 10 and above, running on Windows 7/8.1 may still work. We are limited by realm currently, as they choose to only support 8.1 and higher.
+                    // See https://www.mongodb.com/docs/realm/sdk/dotnet/compatibility/
+                    if (windowsVersion.Major < 6 || (windowsVersion.Major == 6 && windowsVersion.Minor <= 2))
                     {
-                        // If users running in compatibility mode becomes more of a common thing, we may want to provide better guidance or even consider
-                        // disabling it ourselves.
-                        // We could also better detect compatibility mode if required:
-                        // https://stackoverflow.com/questions/10744651/how-i-can-detect-if-my-application-is-running-under-compatibility-mode#comment58183249_10744730
-                        SDL3.SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags.SDL_MESSAGEBOX_ERROR,
-                            "Your operating system is too old to run osu!"u8,
-                            "This version of osu! requires at least Windows 8.1 to run.\n"u8
-                            + "Please upgrade your operating system or consider using an older version of osu!.\n\n"u8
-                            + "If you are running a newer version of windows, please check you don't have \"Compatibility mode\" turned on for osu!"u8, null);
-                        return;
+                        unsafe
+                        {
+                            // If users running in compatibility mode becomes more of a common thing, we may want to provide better guidance or even consider
+                            // disabling it ourselves.
+                            // We could also better detect compatibility mode if required:
+                            // https://stackoverflow.com/questions/10744651/how-i-can-detect-if-my-application-is-running-under-compatibility-mode#comment58183249_10744730
+                            SDL3.SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags.SDL_MESSAGEBOX_ERROR,
+                                "Your operating system is too old to run osu!"u8,
+                                "This version of osu! requires at least Windows 8.1 to run.\n"u8
+                                + "Please upgrade your operating system or consider using an older version of osu!.\n\n"u8
+                                + "If you are running a newer version of windows, please check you don't have \"Compatibility mode\" turned on for osu!"u8, null);
+                            return;
+                        }
                     }
                 }
-            }
 
-            // NVIDIA profiles are based on the executable name of a process.
-            // Lazer and stable share the same executable name.
-            // Stable sets this setting to "Off", which may not be what we want, so let's force it back to the default "Auto" on startup.
-            if (OperatingSystem.IsWindows())
-                NVAPI.ThreadedOptimisations = NvThreadControlSetting.OGL_THREAD_CONTROL_DEFAULT;
+                // NVIDIA profiles are based on the executable name of a process.
+                // Lazer and stable share the same executable name.
+                // Stable sets this setting to "Off", which may not be what we want, so let's force it back to the default "Auto" on startup.
+                if (OperatingSystem.IsWindows())
+                    NVAPI.ThreadedOptimisations = NvThreadControlSetting.OGL_THREAD_CONTROL_DEFAULT;
 
-            // Back up the cwd before DesktopGameHost changes it
-            string cwd = Environment.CurrentDirectory;
+                // Back up the cwd before DesktopGameHost changes it
+                string cwd = Environment.CurrentDirectory;
 
-            string gameName = base_game_name;
-            bool tournamentClient = false;
+                string gameName = base_game_name;
+                bool tournamentClient = false;
 
-            foreach (string arg in args)
-            {
-                string[] split = arg.Split('=');
-
-                string key = split[0];
-                string val = split.Length > 1 ? split[1] : string.Empty;
-
-                switch (key)
+                foreach (string arg in args)
                 {
-                    case "--tournament":
-                        tournamentClient = true;
-                        break;
+                    string[] split = arg.Split('=');
 
-                    case "--debug-client-id":
+                    string key = split[0];
+                    string val = split.Length > 1 ? split[1] : string.Empty;
+
+                    switch (key)
+                    {
+                        case "--tournament":
+                            tournamentClient = true;
+                            break;
+
+                        case "--debug-client-id":
+                            if (!DebugUtils.IsDebugBuild)
+                                throw new InvalidOperationException("Cannot use this argument in a non-debug build.");
+
+                            if (!int.TryParse(val, out int clientID))
+                                throw new ArgumentException("Provided client ID must be an integer.");
+
+                            gameName = $"{base_game_name}-{clientID}";
+                            break;
+                    }
+                }
+
+                var hostOptions = new HostOptions
+                {
+                    IPCPipeName = !tournamentClient ? OsuGame.IPC_PIPE_NAME : null,
+                    FriendlyGameName = OsuGameBase.GAME_NAME,
+                };
+
+                using (DesktopGameHost host = Host.GetSuitableDesktopHost(gameName, hostOptions))
+                {
+                    if (!host.IsPrimaryInstance)
+                    {
+                        if (trySendIPCMessage(host, cwd, args))
+                            return;
+
+                        // we want to allow multiple instances to be started when in debug.
                         if (!DebugUtils.IsDebugBuild)
-                            throw new InvalidOperationException("Cannot use this argument in a non-debug build.");
+                        {
+                            Logger.Log(@"osu! does not support multiple running instances.", LoggingTarget.Runtime, LogLevel.Error);
+                            return;
+                        }
+                    }
 
-                        if (!int.TryParse(val, out int clientID))
-                            throw new ArgumentException("Provided client ID must be an integer.");
+                    if (host.IsPrimaryInstance)
+                    {
+                        try
+                        {
+                            Logger.Log("Starting legacy IPC provider...");
+                            legacyIpc = new LegacyTcpIpcProvider();
+                            legacyIpc.Bind();
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex, "Failed to start legacy IPC provider");
+                            SentryConfig.CaptureException(ex, "LegacyTcpIpcProvider.Bind");
+                        }
+                    }
 
-                        gameName = $"{base_game_name}-{clientID}";
-                        break;
+                    if (tournamentClient)
+                        host.Run(new TournamentGame());
+                    else
+                    {
+                        host.Run(new OsuGameDesktop(args)
+                        {
+                            IsFirstRun = isFirstRun,
+                            EnableWebSocketServer = Environment.GetEnvironmentVariable("OSU_WEBSOCKET_SERVER") == "1",
+                        });
+                    }
                 }
             }
-
-            var hostOptions = new HostOptions
+            catch (Exception ex)
             {
-                IPCPipeName = !tournamentClient ? OsuGame.IPC_PIPE_NAME : null,
-                FriendlyGameName = OsuGameBase.GAME_NAME,
-            };
-
-            using (DesktopGameHost host = Host.GetSuitableDesktopHost(gameName, hostOptions))
+                SentryConfig.CaptureException(ex, "Program.Main");
+                throw;
+            }
+            finally
             {
-                if (!host.IsPrimaryInstance)
-                {
-                    if (trySendIPCMessage(host, cwd, args))
-                        return;
-
-                    // we want to allow multiple instances to be started when in debug.
-                    if (!DebugUtils.IsDebugBuild)
-                    {
-                        Logger.Log(@"osu! does not support multiple running instances.", LoggingTarget.Runtime, LogLevel.Error);
-                        return;
-                    }
-                }
-
-                if (host.IsPrimaryInstance)
-                {
-                    try
-                    {
-                        Logger.Log("Starting legacy IPC provider...");
-                        legacyIpc = new LegacyTcpIpcProvider();
-                        legacyIpc.Bind();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error(ex, "Failed to start legacy IPC provider");
-                    }
-                }
-
-                if (tournamentClient)
-                    host.Run(new TournamentGame());
-                else
-                {
-                    host.Run(new OsuGameDesktop(args)
-                    {
-                        IsFirstRun = isFirstRun,
-                        EnableWebSocketServer = Environment.GetEnvironmentVariable("OSU_WEBSOCKET_SERVER") == "1",
-                    });
-                }
+                SentryConfig.Shutdown();
             }
         }
 
