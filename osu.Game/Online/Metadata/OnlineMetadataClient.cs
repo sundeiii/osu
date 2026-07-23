@@ -108,8 +108,9 @@ namespace osu.Game.Online.Metadata
             {
                 Schedule(() =>
                 {
-                    userPresences.Clear();
-                    friendPresences.Clear();
+                    // Do not clear user/friend presences here.
+                    // A metadata transport disconnect is not the same thing as the server
+                    // saying those users are offline.
                     WatchedRooms.Clear();
                     dailyChallengeInfo.Value = null;
                     localUserPresence = default;
@@ -125,6 +126,7 @@ namespace osu.Game.Online.Metadata
             {
                 UpdateActivity(userActivity.Value).FireAndForget();
                 UpdateStatus(userStatus.Value).FireAndForget();
+                RefreshFriends().FireAndForget();
             }
 
             if (lastQueueId.Value >= 0)
@@ -297,10 +299,33 @@ namespace osu.Game.Online.Metadata
         public override async Task RefreshFriends()
         {
             if (connector?.IsConnected.Value != true)
-                throw new OperationCanceledException();
+                return;
 
-            Debug.Assert(connection != null);
-            await connection.InvokeAsync(nameof(IMetadataServer.RefreshFriends)).ConfigureAwait(false);
+            HubConnection? currentConnection = connection;
+
+            if (currentConnection == null ||
+                currentConnection.State != HubConnectionState.Connected)
+            {
+                return;
+            }
+
+            try
+            {
+                await currentConnection.InvokeAsync(
+                    nameof(IMetadataServer.RefreshFriends)).ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Logout/disconnect race. Safe to ignore.
+            }
+            catch (InvalidOperationException)
+            {
+                // Connection changed state between the check and InvokeAsync().
+            }
+            catch (OperationCanceledException)
+            {
+                // Disconnect/logout in progress.
+            }
         }
 
         protected override void Dispose(bool isDisposing)

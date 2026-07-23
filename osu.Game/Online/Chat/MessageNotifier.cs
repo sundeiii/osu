@@ -94,7 +94,10 @@ namespace osu.Game.Online.Chat
             if (!messages.Any())
                 return;
 
-            var channel = channelManager.JoinedChannels.SingleOrDefault(c => c.Id > 0 && c.Id == messages.First().ChannelId);
+            Message firstMessage = messages.First();
+
+            var channel = channelManager.JoinedChannels
+                                        .FirstOrDefault(c => c.Id > 0 && c.Id == firstMessage.ChannelId);
 
             if (channel == null)
                 return;
