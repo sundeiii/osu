@@ -45,6 +45,8 @@ namespace osu.Game.Rulesets.Osu.UI
             (OsuRulesetConfigManager)base.Config;
 
         // Hidden Relax state.
+        private const double relax_hit_offset = -6.0;
+
         private bool relaxWasEnabled;
         private bool relaxIsDown;
         private bool relaxWasLeft;
@@ -207,6 +209,11 @@ namespace osu.Game.Rulesets.Osu.UI
             void handleHitCircle(DrawableHitCircle circle)
             {
                 if (!circle.HitArea.IsHovered)
+                    return;
+
+                double hitTime = circle.HitObject.StartTime + relax_hit_offset;
+
+                if (time < hitTime)
                     return;
 
                 Debug.Assert(
