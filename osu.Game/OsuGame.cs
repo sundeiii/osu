@@ -558,7 +558,28 @@ namespace osu.Game
                     break;
 
                 case LinkAction.OpenUserProfile:
-                    ShowUser((IUser)link.Argument);
+                    switch (link.Argument)
+                    {
+                        case IUser user:
+                            ShowUser(user);
+                            break;
+
+                        case string userLink when tryGetUserIdFromLinkArgument(userLink, out int userId):
+                            ShowUser(new APIUser
+                            {
+                                Id = userId,
+                                Username = userId.ToString(),
+                            });
+                            break;
+
+                        case string username when !string.IsNullOrWhiteSpace(username):
+                            ShowUser(new APIUser
+                            {
+                                Username = username,
+                            });
+                            break;
+                    }
+
                     break;
 
                 case LinkAction.OpenWiki:
@@ -620,6 +641,52 @@ namespace osu.Game
         /// Show a user's profile as an overlay.
         /// </summary>
         /// <param name="user">The user to display.</param>
+
+        private static bool tryGetUserIdFromLinkArgument(string value, out int userId)
+        {
+            userId = 0;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            value = value.Trim().TrimEnd('/');
+
+            if (int.TryParse(value, out userId))
+                return true;
+
+            int usersIndex = value.LastIndexOf("/users/", StringComparison.OrdinalIgnoreCase);
+
+            if (usersIndex >= 0)
+            {
+                string userPart = value.Substring(usersIndex + "/users/".Length);
+
+                int slashIndex = userPart.IndexOf('/');
+
+                if (slashIndex >= 0)
+                    userPart = userPart.Substring(0, slashIndex);
+
+                int questionIndex = userPart.IndexOf('?');
+
+                if (questionIndex >= 0)
+                    userPart = userPart.Substring(0, questionIndex);
+
+                return int.TryParse(userPart, out userId);
+            }
+
+            int lastSlash = value.LastIndexOf('/');
+
+            if (lastSlash < 0 || lastSlash == value.Length - 1)
+                return false;
+
+            string lastPart = value.Substring(lastSlash + 1);
+
+            int queryIndex = lastPart.IndexOf('?');
+
+            if (queryIndex >= 0)
+                lastPart = lastPart.Substring(0, queryIndex);
+
+            return int.TryParse(lastPart, out userId);
+        }
         public void ShowUser(IUser user) => waitForReady(() => userProfile, _ => userProfile.ShowUser(user));
 
         /// <summary>

@@ -10,7 +10,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Online.API.Requests;
+using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Admin;
 using osu.Game.Online.API.Requests.Responses.Admin;
 
@@ -20,7 +20,7 @@ namespace osu.Game.Overlays.Admin
     {
         private void loadReports()
         {
-                        reportsFlow.Clear();
+            reportsFlow.Clear();
             reportsStatusText.Text = "0 open reports";
 
             reportsFlow.Add(createEmptyState(
@@ -50,10 +50,12 @@ namespace osu.Game.Overlays.Admin
                 else
                 {
                     foreach (APIAdminNewsPost post in posts)
+                    {
                         newsFlow.Add(new AdminNewsPostRow(
                             post,
                             selectNewsPost,
                             deleteNewsPost));
+                    }
                 }
 
                 newsStatusText.Text = posts.Count == 1
@@ -81,10 +83,11 @@ namespace osu.Game.Overlays.Admin
             newsAuthorBox.Text = post.Author;
             newsPreviewBox.Text = post.Preview;
             newsImageBox.Text = post.FirstImage ?? string.Empty;
-            newsContentBox.Text = post.Content ?? string.Empty;
             newsPublishedAtBox.Text = post.PublishedAt
                 .ToLocalTime()
                 .ToString("yyyy-MM-dd HH:mm:ss");
+
+            setNewsContent(post.Content ?? string.Empty);
 
             newsStatusText.Text = $"editing news post #{post.Id}";
         }
@@ -99,9 +102,75 @@ namespace osu.Game.Overlays.Admin
             newsPreviewBox.Text = string.Empty;
             newsImageBox.Text = string.Empty;
             newsPublishedAtBox.Text = string.Empty;
-            newsContentBox.Text = string.Empty;
+
+            clearNewsContent();
 
             newsStatusText.Text = "creating new news post";
+        }
+
+        private void applyNewsFrontMatter(AdminMarkdownEditor.NewsFrontMatter frontMatter)
+        {
+            if (frontMatter == null)
+                return;
+
+            if (!string.IsNullOrWhiteSpace(frontMatter.Title))
+            {
+                newsTitleBox.Text = frontMatter.Title;
+                newsSlugBox.Text = slugify(frontMatter.Title);
+            }
+
+            if (!string.IsNullOrWhiteSpace(frontMatter.Date))
+                newsPublishedAtBox.Text = frontMatter.Date;
+
+            if (!string.IsNullOrWhiteSpace(frontMatter.Preview))
+                newsPreviewBox.Text = frontMatter.Preview;
+
+            if (!string.IsNullOrWhiteSpace(frontMatter.FirstImage))
+                newsImageBox.Text = frontMatter.FirstImage;
+        }
+
+        private void setNewsContent(string content)
+        {
+            newsContent = stripNewsFrontMatter(content ?? string.Empty);
+
+            if (newsContentEditor != null)
+                newsContentEditor.Current.Value = newsContent;
+        }
+
+        private void clearNewsContent()
+        {
+            newsContent = string.Empty;
+
+            if (newsContentEditor != null)
+                newsContentEditor.Clear();
+        }
+
+        private static string stripNewsFrontMatter(string content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+                return string.Empty;
+
+            string normalised = content.Replace("\r\n", "\n").TrimStart();
+
+            if (!normalised.StartsWith("---", StringComparison.Ordinal))
+                return content;
+
+            int firstEnd = normalised.IndexOf('\n');
+
+            if (firstEnd < 0)
+                return content;
+
+            int secondFence = normalised.IndexOf("\n---", firstEnd, StringComparison.Ordinal);
+
+            if (secondFence < 0)
+                return content;
+
+            int bodyStart = secondFence + "\n---".Length;
+
+            if (bodyStart < normalised.Length && normalised[bodyStart] == '\n')
+                bodyStart++;
+
+            return normalised.Substring(bodyStart).TrimStart();
         }
 
         private void saveNewsPost()
@@ -124,7 +193,9 @@ namespace osu.Game.Overlays.Admin
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(newsContentBox.Text))
+            newsContent = stripNewsFrontMatter(newsContentEditor?.Text ?? newsContent);
+
+            if (string.IsNullOrWhiteSpace(newsContent))
             {
                 newsStatusText.Text = "content is required";
                 return;
@@ -146,6 +217,7 @@ namespace osu.Game.Overlays.Admin
                 Loading.Hide();
 
                 selectedNewsPost = post;
+                setNewsContent(post.Content ?? newsContent);
 
                 newsStatusText.Text = $"saved news post #{post.Id}";
                 loadNews();
@@ -181,7 +253,7 @@ namespace osu.Game.Overlays.Admin
                 Slug = newsSlugBox.Text.Trim(),
                 Title = newsTitleBox.Text.Trim(),
                 Preview = newsPreviewBox.Text.Trim(),
-                Content = newsContentBox.Text,
+                Content = stripNewsFrontMatter(newsContentEditor?.Text ?? newsContent),
                 PublishedAt = publishedAt,
             };
         }
@@ -338,6 +410,7 @@ namespace osu.Game.Overlays.Admin
                         ? "1 beatmap found"
                         : $"{response.Total:N0} beatmaps found · page {beatmapPage:N0}/{beatmapPageCount:N0}";
                 }
+
                 Loading.Hide();
             };
 

@@ -52,7 +52,9 @@ namespace osu.Game.Overlays.Admin
         private OsuTextBox newsPreviewBox;
         private OsuTextBox newsImageBox;
         private OsuTextBox newsPublishedAtBox;
-        private OsuTextBox newsContentBox;
+        private AdminMarkdownEditor newsContentEditor;
+
+        private string newsContent = string.Empty;
 
         private Container systemSummaryContainer;
         private FillFlowContainer systemServicesFlow;

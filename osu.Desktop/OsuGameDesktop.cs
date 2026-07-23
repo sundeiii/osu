@@ -23,6 +23,7 @@ using osu.Game.IO;
 using osu.Game.IPC;
 using osu.Game.Performance;
 using osu.Game.Utils;
+using osu.Game.Overlays.News.Displays;
 
 namespace osu.Desktop
 {
@@ -30,6 +31,7 @@ namespace osu.Desktop
     {
         private OsuSchemeLinkIPCChannel? osuSchemeLinkIPCChannel;
         private ArchiveImportIPCChannel? archiveImportIPCChannel;
+        private INewsVideoEmbedHost? newsVideoEmbedHost;
 
         [Cached(typeof(IHighPerformanceSessionManager))]
         private readonly HighPerformanceSessionManager highPerformanceSessionManager = new HighPerformanceSessionManager();
@@ -41,6 +43,20 @@ namespace osu.Desktop
         public OsuGameDesktop(string[]? args = null)
             : base(args)
         {
+        }
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(
+            IReadOnlyDependencyContainer parent)
+        {
+            var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+
+            if (OperatingSystem.IsWindows())
+            {
+                newsVideoEmbedHost = new WebView2NewsVideoEmbedHost();
+                dependencies.CacheAs<INewsVideoEmbedHost>(newsVideoEmbedHost);
+            }
+
+            return dependencies;
         }
 
         public override StableStorage? GetStorageForStableInstall()
@@ -109,11 +125,6 @@ namespace osu.Desktop
 
         protected override UpdateManager CreateUpdateManager()
         {
-            // If this is the first time we've run the game, ie it is being installed,
-            // reset the user's release stream to "lazer".
-            //
-            // This ensures that if a user is trying to recover from a failed startup on an unstable release stream,
-            // the game doesn't immediately try and update them back to the release stream after starting up.
             if (IsFirstRun)
                 LocalConfig.SetValue(OsuSetting.ReleaseStream, ReleaseStream.Lazer);
 
@@ -160,7 +171,6 @@ namespace osu.Desktop
         {
             base.SetHost(host);
 
-            // Apple operating systems use a better icon provided via external assets.
             if (!RuntimeInfo.IsApple)
             {
                 var iconStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(GetType(), "lazer.ico");
@@ -176,8 +186,12 @@ namespace osu.Desktop
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
+
             osuSchemeLinkIPCChannel?.Dispose();
             archiveImportIPCChannel?.Dispose();
+
+            if (newsVideoEmbedHost is IDisposable disposableVideoHost)
+                disposableVideoHost.Dispose();
         }
     }
 }

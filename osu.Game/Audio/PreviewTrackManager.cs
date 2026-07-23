@@ -6,6 +6,7 @@ using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -20,8 +21,9 @@ namespace osu.Game.Audio
         private readonly BindableDouble muteBindable = new BindableDouble();
 
         private ITrackStore trackStore = null!;
+        private ITrackStore directTrackStore = null!;
 
-        protected TrackManagerPreviewTrack? CurrentTrack;
+        protected PreviewTrack? CurrentTrack;
 
         public readonly BindableBool IsPlayingPreview = new BindableBool();
 
@@ -34,6 +36,7 @@ namespace osu.Game.Audio
         private void load(AudioManager audioManager, OsuConfigManager config)
         {
             trackStore = audioManager.GetTrackStore(new TrustedDomainOnlineStore(config));
+            directTrackStore = audioManager.GetTrackStore(new OnlineStore());
         }
 
         /// <summary>
@@ -45,6 +48,26 @@ namespace osu.Game.Audio
         {
             var track = CreatePreviewTrack(beatmapSetInfo, trackStore);
 
+            prepareTrack(track);
+
+            return track;
+        }
+
+        /// <summary>
+        /// Retrieves a <see cref="PreviewTrack"/> for a direct audio URL.
+        /// Used by news article audio embeds.
+        /// </summary>
+        public PreviewTrack GetUrl(string previewUrl)
+        {
+            var track = new UrlPreviewTrack(previewUrl, directTrackStore);
+
+            prepareTrack(track);
+
+            return track;
+        }
+
+        private void prepareTrack(PreviewTrack track)
+        {
             track.Started += () => Schedule(() =>
             {
                 CurrentTrack?.Stop();
@@ -62,8 +85,6 @@ namespace osu.Game.Audio
                 mainTrackAdjustments.RemoveAdjustment(AdjustableProperty.Volume, muteBindable);
                 IsPlayingPreview.Value = false;
             });
-
-            return track;
         }
 
         /// <summary>
@@ -74,11 +95,25 @@ namespace osu.Game.Audio
         /// can globally stop the currently playing <see cref="PreviewTrack"/>. The object holding a reference to the <see cref="PreviewTrack"/>
         /// can always stop the <see cref="PreviewTrack"/> themselves through <see cref="PreviewTrack.Stop()"/>.
         /// </remarks>
-        /// <param name="source">The <see cref="IPreviewTrackOwner"/> which may be the owner of the <see cref="PreviewTrack"/>.</param>
+        /// <param name="source">The <see cref="IPreviewTrackOwner"/> which may be the owner of the playing <see cref="PreviewTrack"/>.</param>
         public void StopAnyPlaying(IPreviewTrackOwner source)
         {
-            if (CurrentTrack == null || (CurrentTrack.Owner != null && CurrentTrack.Owner != source))
+            if (CurrentTrack == null)
                 return;
+
+            if (CurrentTrack is TrackManagerPreviewTrack beatmapPreview
+                && beatmapPreview.Owner != null
+                && beatmapPreview.Owner != source)
+            {
+                return;
+            }
+
+            if (CurrentTrack is UrlPreviewTrack urlPreview
+                && urlPreview.Owner != null
+                && urlPreview.Owner != source)
+            {
+                return;
+            }
 
             CurrentTrack.Stop();
             // CurrentTrack should not be set to null here as it will result in incorrect handling in the track.Stopped callback above.
@@ -112,11 +147,39 @@ namespace osu.Game.Audio
                     Logger.Log($"A {nameof(PreviewTrack)} was created without a containing {nameof(IPreviewTrackOwner)}. An owner should be added for correct behaviour.");
             }
 
-            protected override Track GetTrack()
+            protected override Track? GetTrack()
             {
                 string previewUrl =
                     $"https://b.rinarii.de/preview/{beatmapSetInfo.OnlineID}.mp3";
 
+                return trackManager.Get(previewUrl);
+            }
+        }
+
+        public partial class UrlPreviewTrack : PreviewTrack
+        {
+            [Resolved]
+            public IPreviewTrackOwner? Owner { get; private set; }
+
+            private readonly string previewUrl;
+            private readonly ITrackStore trackManager;
+
+            public UrlPreviewTrack(string previewUrl, ITrackStore trackManager)
+            {
+                this.previewUrl = previewUrl;
+                this.trackManager = trackManager;
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                if (Owner == null)
+                    Logger.Log($"A {nameof(PreviewTrack)} was created without a containing {nameof(IPreviewTrackOwner)}. An owner should be added for correct behaviour.");
+            }
+
+            protected override Track? GetTrack()
+            {
                 return trackManager.Get(previewUrl);
             }
         }
