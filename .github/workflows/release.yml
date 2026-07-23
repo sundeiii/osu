@@ -163,7 +163,8 @@ jobs:
         shell: bash
         run: |
           dotnet restore osu.Desktop/osu.Desktop.csproj \
-            --runtime ${{ matrix.runtime }} \
+            -p:TargetFramework=${{ matrix.framework }} \
+            -p:RuntimeIdentifier=${{ matrix.runtime }} \
             --verbosity normal
 
       - name: Create macOS icon
@@ -209,6 +210,7 @@ jobs:
         run: |
           dotnet publish osu.Desktop/osu.Desktop.csproj \
             --configuration Release \
+            --framework ${{ matrix.framework }} \
             --runtime ${{ matrix.runtime }} \
             --self-contained true \
             --output "publish/${{ matrix.runtime }}" \
