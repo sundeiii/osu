@@ -10,6 +10,7 @@ env:
   APP_ID: "rinari-lazer"
   APP_TITLE: "Rinari Lazer"
   APP_AUTHORS: "Rinari Development Team"
+  SENTRY_PROJECT: "rinari-lazer-client"
 
 permissions:
   contents: write
@@ -26,6 +27,7 @@ jobs:
       assemblyVersion: ${{ steps.version.outputs.assemblyVersion }}
       fileVersion: ${{ steps.version.outputs.fileVersion }}
       velopackVersion: ${{ steps.version.outputs.velopackVersion }}
+      sentryRelease: ${{ steps.version.outputs.sentryRelease }}
 
     steps:
       - name: Determine version
@@ -36,9 +38,9 @@ jobs:
           SEMVER="${VERSION#v}"
 
           # Example:
-          # tag: v2026.709.0-lazer
-          # semver: 2026.709.0-lazer
-          # cleanVersion: 2026.709.0
+          # tag: v2026.723.0-lazer
+          # semver: 2026.723.0-lazer
+          # cleanVersion: 2026.723.0
           CLEAN_VERSION="${SEMVER%%-*}"
 
           # Assembly/FileVersion need 4 numeric parts.
@@ -51,18 +53,23 @@ jobs:
           # Velopack wants 3-part semver without pre-release suffix.
           VELOPACK_VERSION=$(echo "$ASSEMBLY_VERSION" | awk -F. '{print $1"."$2"."$3}')
 
+          # Sentry release should match SentryConfig.cs getRelease().
+          SENTRY_RELEASE="rinari-lazer@$CLEAN_VERSION"
+
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "semver=$SEMVER" >> "$GITHUB_OUTPUT"
           echo "cleanVersion=$CLEAN_VERSION" >> "$GITHUB_OUTPUT"
           echo "assemblyVersion=$ASSEMBLY_VERSION" >> "$GITHUB_OUTPUT"
           echo "fileVersion=$ASSEMBLY_VERSION" >> "$GITHUB_OUTPUT"
           echo "velopackVersion=$VELOPACK_VERSION" >> "$GITHUB_OUTPUT"
+          echo "sentryRelease=$SENTRY_RELEASE" >> "$GITHUB_OUTPUT"
 
           echo "Version: $VERSION"
           echo "SemVer: $SEMVER"
           echo "Clean version: $CLEAN_VERSION"
           echo "Assembly/File version: $ASSEMBLY_VERSION"
           echo "Velopack version: $VELOPACK_VERSION"
+          echo "Sentry release: $SENTRY_RELEASE"
 
   build:
     name: Build ${{ matrix.artifact-name }}
@@ -104,7 +111,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-    
+
       - name: Checkout custom osu-resources
         shell: bash
         run: |
@@ -139,6 +146,7 @@ jobs:
           echo "Clean version: ${{ needs.version.outputs.cleanVersion }}"
           echo "Assembly version: ${{ needs.version.outputs.assemblyVersion }}"
           echo "Velopack version: ${{ needs.version.outputs.velopackVersion }}"
+          echo "Sentry release: ${{ needs.version.outputs.sentryRelease }}"
 
       - name: Clean previous build artifacts
         shell: bash
@@ -193,7 +201,7 @@ jobs:
       - name: Publish desktop app
         shell: bash
         env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          RINARI_SENTRY_DSN: ${{ secrets.RINARI_SENTRY_DSN }}
         run: |
           dotnet publish osu.Desktop/osu.Desktop.csproj \
             --configuration Release \
@@ -204,12 +212,12 @@ jobs:
             --verbosity normal \
             -p:PublishSingleFile=false \
             -p:PublishTrimmed=false \
-            -p:Version=${{ needs.version.outputs.semver }} \
+            -p:Version=${{ needs.version.outputs.cleanVersion }} \
             -p:FileVersion=${{ needs.version.outputs.fileVersion }} \
             -p:AssemblyVersion=${{ needs.version.outputs.assemblyVersion }} \
             -p:InformationalVersion=${{ needs.version.outputs.version }} \
             -p:ContinuousIntegrationBuild=true \
-            -p:SentryDsn="${SENTRY_DSN:-}"
+            -p:SentryDsn="${RINARI_SENTRY_DSN:-}"
 
       - name: Set executable permissions
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
@@ -362,6 +370,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download installer artifacts
         uses: actions/download-artifact@v4
         with:
@@ -373,7 +386,7 @@ jobs:
         shell: bash
         run: |
           echo "Release files:"
-          find release-files -type f -maxdepth 2 -print
+          find release-files -maxdepth 2 -type f -print
           ls -al release-files
 
       - name: Create GitHub Release
@@ -388,3 +401,16 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Sentry Release
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
+        with:
+          environment: production
+          version: ${{ needs.version.outputs.sentryRelease }}
+          set_commits: auto
+          finalize: true
+          ignore_empty: true
