@@ -5,7 +5,9 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Versioning;
+#if WINDOWS
 using Microsoft.Win32;
+#endif
 using osu.Desktop.IPC;
 using osu.Desktop.Performance;
 using osu.Desktop.Security;
@@ -16,7 +18,9 @@ using osu.Framework;
 using osu.Framework.Logging;
 using osu.Game.Updater;
 using osu.Desktop.MacOS;
+#if WINDOWS
 using osu.Desktop.Windows;
+#endif
 using osu.Framework.Allocation;
 using osu.Game.Configuration;
 using osu.Game.IO;
@@ -31,7 +35,9 @@ namespace osu.Desktop
     {
         private OsuSchemeLinkIPCChannel? osuSchemeLinkIPCChannel;
         private ArchiveImportIPCChannel? archiveImportIPCChannel;
+        #if WINDOWS
         private INewsVideoEmbedHost? newsVideoEmbedHost;
+        #endif
 
         [Cached(typeof(IHighPerformanceSessionManager))]
         private readonly HighPerformanceSessionManager highPerformanceSessionManager = new HighPerformanceSessionManager();
@@ -50,11 +56,13 @@ namespace osu.Desktop
         {
             var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
 
+#if WINDOWS
             if (OperatingSystem.IsWindows())
             {
                 newsVideoEmbedHost = new WebView2NewsVideoEmbedHost();
                 dependencies.CacheAs<INewsVideoEmbedHost>(newsVideoEmbedHost);
             }
+#endif
 
             return dependencies;
         }
@@ -84,6 +92,7 @@ namespace osu.Desktop
 
             string? stableInstallPath;
 
+            #if WINDOWS
             if (OperatingSystem.IsWindows())
             {
                 try
@@ -102,6 +111,7 @@ namespace osu.Desktop
                 {
                 }
             }
+            #endif
 
             stableInstallPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"osu!");
             if (checkExists(stableInstallPath))
@@ -114,12 +124,14 @@ namespace osu.Desktop
             return null;
         }
 
+        #if WINDOWS
         [SupportedOSPlatform("windows")]
         private string? getStableInstallPathFromRegistry(string progId)
         {
             using (RegistryKey? key = Registry.ClassesRoot.OpenSubKey(progId))
                 return key?.OpenSubKey(WindowsAssociationManager.SHELL_OPEN_COMMAND)?.GetValue(string.Empty)?.ToString()?.Split('"')[1].Replace("osu!.exe", "");
         }
+        #endif
 
         public static bool IsPackageManaged => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OSU_EXTERNAL_UPDATE_PROVIDER"));
 
@@ -148,13 +160,14 @@ namespace osu.Desktop
 
             switch (RuntimeInfo.OS)
             {
+            #if WINDOWS
                 case RuntimeInfo.Platform.Windows:
                     LoadComponentAsync(new GameplayWinKeyBlocker(), Add);
                     break;
+            #endif
 
                 case RuntimeInfo.Platform.macOS when !IsPackageManaged && IsDeployedBuild:
-                    if (!IsPackageManaged && IsDeployedBuild)
-                        LoadComponentAsync(new MacOSAppLocationChecker(), Add);
+                    LoadComponentAsync(new MacOSAppLocationChecker(), Add);
                     break;
             }
 
@@ -190,8 +203,10 @@ namespace osu.Desktop
             osuSchemeLinkIPCChannel?.Dispose();
             archiveImportIPCChannel?.Dispose();
 
+            #if WINDOWS
             if (newsVideoEmbedHost is IDisposable disposableVideoHost)
                 disposableVideoHost.Dispose();
+            #endif
         }
     }
 }
