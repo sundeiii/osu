@@ -71,7 +71,7 @@ namespace osu.Game.Screens.Ranking
                         break;
 
                     case DownloadState.NotDownloaded:
-                        scoreDownloader.DownloadAsUpdate(Score.Value!, false);
+                        scoreDownloader.Download(Score.Value!, false);
                         break;
 
                     case DownloadState.Importing:
