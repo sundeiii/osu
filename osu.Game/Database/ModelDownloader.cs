@@ -44,6 +44,16 @@ namespace osu.Game.Database
         /// <returns>The request object.</returns>
         protected abstract ArchiveDownloadRequest<T> CreateDownloadRequest(T model, bool minimiseDownloadSize);
 
+        /// <summary>
+        /// Allows subclasses to fix metadata after an archive-backed model has been imported.
+        /// </summary>
+        /// <remarks>
+        /// This is used by downloaded online replays, where the replay file itself may contain stale legacy metadata.
+        /// </remarks>
+        protected virtual void PostProcessImportedModels(ArchiveDownloadRequest<T> request, IEnumerable<Live<TModel>> imported)
+        {
+        }
+
         public bool Download(T model, bool minimiseDownloadSize = false) => Download(model, minimiseDownloadSize, null);
 
         public void DownloadAsUpdate(TModel originalModel, bool minimiseDownloadSize) => Download(originalModel, minimiseDownloadSize, originalModel);
@@ -73,10 +83,34 @@ namespace osu.Game.Database
 
                     try
                     {
+                        // For downloaded online models, the requested API model is the authoritative display source.
+                        // This is especially important for downloaded replays, whose .osr metadata may contain stale legacy usernames.
+                        notification.CompletionText = $"Imported {request.Model.GetDisplayString()}!";
+
+                        IEnumerable<Live<TModel>> imported = Array.Empty<Live<TModel>>();
+
                         if (originalModel != null)
-                            importSuccessful = (await importer.ImportAsUpdate(notification, new ImportTask(filename), originalModel).ConfigureAwait(false)) != null;
+                        {
+                            var importedUpdate = await importer.ImportAsUpdate(notification, new ImportTask(filename), originalModel).ConfigureAwait(false);
+
+                            if (importedUpdate != null)
+                                imported = new[] { importedUpdate };
+                        }
                         else
-                            importSuccessful = (await importer.Import(notification, new[] { new ImportTask(filename) }).ConfigureAwait(false)).Any();
+                        {
+                            imported = (await importer.Import(notification, new[] { new ImportTask(filename) }).ConfigureAwait(false)).ToArray();
+                        }
+
+                        importSuccessful = imported.Any();
+
+                        if (importSuccessful)
+                        {
+                            PostProcessImportedModels(request, imported);
+
+                            // The importer may have generated completion text from stale archive metadata.
+                            // For downloads, the requested online model is the authoritative display source.
+                            notification.CompletionText = $"Imported {request.Model.GetDisplayString()}!";
+                        }
                     }
                     finally
                     {
