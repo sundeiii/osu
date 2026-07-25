@@ -165,7 +165,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
 
                 new SettingsItemV2(new FormSliderBar<int>
                 {
-                    Caption = "Aim assist speed",
+                    Caption = "Aim assist strength",
                     Current = aimAssistSpeed,
                     KeyboardStep = 1,
                     LabelFormat = v => $"{v}",
@@ -173,7 +173,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
 
                 new SettingsItemV2(new FormSliderBar<int>
                 {
-                    Caption = "Aim assist starting distance",
+                    Caption = "Activation radius",
                     Current = aimAssistStartingDistance,
                     KeyboardStep = 1,
                     LabelFormat = v => $"{v}px",
@@ -181,7 +181,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
 
                 new SettingsItemV2(new FormSliderBar<int>
                 {
-                    Caption = "Aim assist stopping distance",
+                    Caption = "Stop radius",
                     Current = aimAssistStoppingDistance,
                     KeyboardStep = 1,
                     LabelFormat = v => $"{v}%",
@@ -189,7 +189,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
 
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "Aim assist on sliders",
+                    Caption = "Assist sliders",
                     Current = aimAssistOnSliders,
                 }),
             };

@@ -38,7 +38,7 @@ namespace osu.Game.Configuration
             new BindableInt(66)
             {
                 MinValue = 0,
-                MaxValue = 300,
+                MaxValue = 66,
             };
 
         public static BindableInt AimAssistStoppingDistance { get; } =

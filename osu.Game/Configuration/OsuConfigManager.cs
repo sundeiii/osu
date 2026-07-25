@@ -211,7 +211,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.AnarchyAimAssist, false);
             SetDefault(OsuSetting.AnarchyAimAssistSpeed, 5, 1, 11);
-            SetDefault(OsuSetting.AnarchyAimAssistStartingDistance, 66, 0, 300);
+            SetDefault(OsuSetting.AnarchyAimAssistStartingDistance, 66, 0, 66);
             SetDefault(OsuSetting.AnarchyAimAssistStoppingDistance, 30, 0, 66);
             SetDefault(OsuSetting.AnarchyAimAssistOnSliders, false);
             // Initialise the runtime state from saved config values,

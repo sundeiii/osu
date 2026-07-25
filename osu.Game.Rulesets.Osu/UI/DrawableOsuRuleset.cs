@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -35,6 +36,11 @@ namespace osu.Game.Rulesets.Osu.UI
     {
         private Bindable<bool>? cursorHideEnabled;
 
+        private const uint mouseeventf_move = 0x0001;
+
+        [DllImport("user32.dll")]
+        private static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, UIntPtr dwExtraInfo);
+
         public new OsuInputManager KeyBindingInputManager =>
             (OsuInputManager)base.KeyBindingInputManager;
 
@@ -45,7 +51,7 @@ namespace osu.Game.Rulesets.Osu.UI
             (OsuRulesetConfigManager)base.Config;
 
         // Hidden Relax state.
-        private const double relax_hit_offset = -6.0;
+        private const double relax_hit_offset = 0;
 
         private bool relaxWasEnabled;
         private bool relaxIsDown;
@@ -235,27 +241,39 @@ namespace osu.Game.Rulesets.Osu.UI
 
             double time = Playfield.Clock.CurrentTime;
 
-            DrawableOsuHitObject? target =
+            var objects =
                 Playfield.HitObjectContainer.AliveObjects
-                         .OfType<DrawableOsuHitObject>()
-                         .Where(drawable => !drawable.IsHit)
-                         .Where(drawable => drawable is not DrawableSpinner)
-                         .Where(drawable => AnarchySettingsState.AimAssistOnSliders || drawable is not DrawableSlider)
-                         .Where(drawable => time <= getEndTime(drawable))
-                         .OrderBy(drawable => drawable.HitObject.StartTime)
-                         .FirstOrDefault();
+                        .OfType<DrawableOsuHitObject>()
+                        .Where(drawable => !drawable.IsHit)
+                        .Where(drawable => time <= getEndTime(drawable))
+                        .OrderBy(drawable => drawable.HitObject.StartTime)
+                        .ToList();
 
-            if (target == null)
+            if (objects.Count == 0)
                 return;
 
-            if (target.HitObject.StartTime - time > 240)
+            /*
+            * Stable OsuBuddy usually targets currentHitObjectIndex + 1 after the first object.
+            * This is intentionally weird, but it matches stable better than always using the first alive object.
+            */
+            DrawableOsuHitObject target = objects.Count > 1 && time > objects[0].HitObject.StartTime
+                ? objects[1]
+                : objects[0];
+
+            if (target is DrawableSpinner)
+                return;
+
+            if (target is DrawableSlider && !AnarchySettingsState.AimAssistOnSliders)
+                return;
+
+            if (target.HitObject.StartTime - time >= 240)
                 return;
 
             Vector2 cursorPosition =
                 Playfield.ToLocalSpace(
                     KeyBindingInputManager.CurrentState.Mouse.Position);
 
-            Vector2 targetPosition = Playfield.ToLocalSpace(target.ScreenSpaceDrawQuad.Centre);
+            Vector2 targetPosition = getTargetPosition(target);
 
             float distance = Vector2.Distance(cursorPosition, targetPosition);
 
@@ -263,10 +281,11 @@ namespace osu.Game.Rulesets.Osu.UI
             int stoppingDistance = AnarchySettingsState.AimAssistStoppingDistance.Value;
             int speed = AnarchySettingsState.AimAssistSpeed.Value;
 
-            if (distance > startingDistance)
+            if (distance >= startingDistance)
                 return;
 
-            float stopRadius = 64f * stoppingDistance / 100f;
+            float hitObjectRadius = (float)target.HitObject.Radius;
+            float stopRadius = hitObjectRadius * stoppingDistance / 100f;
 
             if (distance <= stopRadius)
                 return;
@@ -282,22 +301,42 @@ namespace osu.Game.Rulesets.Osu.UI
                     0f,
                     5f);
 
-            Vector2 nextPosition =
-                cursorPosition +
+            Vector2 movement =
                 Vector2.Normalize(delta) *
-                Math.Min(step * 4f, distance);
+                Math.Min(step, distance);
 
-            new MousePositionAbsoluteInput
+            /*
+            * Stable calculates movement in gamefield units and passes it directly to MoveMouseBy().
+            * Do NOT convert to screen-space here.
+            */
+            if (OperatingSystem.IsWindows())
             {
-                Position = Playfield.ToScreenSpace(nextPosition)
-            }.Apply(
-                KeyBindingInputManager.CurrentState,
-                KeyBindingInputManager);
+                mouse_event(
+                    mouseeventf_move,
+                    (int)Math.Round(movement.X),
+                    (int)Math.Round(movement.Y),
+                    0,
+                    UIntPtr.Zero);
+            }
+            else
+            {
+                Vector2 nextPosition = cursorPosition + movement;
+
+                new MousePositionAbsoluteInput
+                {
+                    Position = Playfield.ToScreenSpace(nextPosition)
+                }.Apply(
+                    KeyBindingInputManager.CurrentState,
+                    KeyBindingInputManager);
+            }
 
             static double getEndTime(DrawableOsuHitObject drawable)
                 => drawable.HitObject is IHasDuration duration
                     ? duration.EndTime
                     : drawable.HitObject.StartTime;
+
+            static Vector2 getTargetPosition(DrawableOsuHitObject drawable)
+                => drawable.Position;
         }
 
         private void enableAnarchyRelax()
