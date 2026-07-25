@@ -253,12 +253,10 @@ namespace osu.Game.Rulesets.Osu.UI
                 return;
 
             /*
-            * Stable OsuBuddy usually targets currentHitObjectIndex + 1 after the first object.
-            * This is intentionally weird, but it matches stable better than always using the first alive object.
+            * In lazer, AliveObjects is not the same as stable's currentHitObjectIndex.
+            * Always targeting the first unhit object is safer and avoids AA pulling away before the current note is judged.
             */
-            DrawableOsuHitObject target = objects.Count > 1 && time > objects[0].HitObject.StartTime
-                ? objects[1]
-                : objects[0];
+            DrawableOsuHitObject target = objects[0];
 
             if (target is DrawableSpinner)
                 return;
