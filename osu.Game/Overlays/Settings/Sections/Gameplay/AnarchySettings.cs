@@ -9,30 +9,45 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.Gameplay
 {
     public partial class AnarchySettings : SettingsSubsection
     {
-        protected override LocalisableString Header => "Anarchy";
+        protected override LocalisableString Header => AnarchySettingsStrings.Header;
 
         public override IEnumerable<LocalisableString> FilterTerms =>
             base.FilterTerms.Concat(new LocalisableString[]
             {
-                "anarchy",
-                "relax",
+                AnarchySettingsStrings.Header,
+                AnarchySettingsStrings.Relax,
+                AnarchySettingsStrings.RelaxDescription,
+                AnarchySettingsStrings.RemoveHidden,
+                AnarchySettingsStrings.RemoveHiddenDescription,
+                AnarchySettingsStrings.EnableTimewarp,
+                AnarchySettingsStrings.EnableTimewarpDescription,
+                AnarchySettingsStrings.TimewarpRate,
+                AnarchySettingsStrings.TimewarpRateDescription,
+                AnarchySettingsStrings.EnableApproachRateChanger,
+                AnarchySettingsStrings.EnableApproachRateChangerDescription,
+                AnarchySettingsStrings.ApproachRate,
+                AnarchySettingsStrings.ApproachRateDescription,
+                AnarchySettingsStrings.AimAssist,
+                AnarchySettingsStrings.AimAssistDescription,
+                AnarchySettingsStrings.CorrectionStrength,
+                AnarchySettingsStrings.CorrectionStrengthDescription,
+                AnarchySettingsStrings.RelativeCorrection,
+                AnarchySettingsStrings.RelativeCorrectionDescription,
                 "autoclick",
                 "hidden",
                 "hd",
-                "timewarp",
                 "speed",
                 "rate",
-                "approach rate",
                 "ar",
-                "aim assist",
                 "aim assistance",
-                "osu buddy",
-                "osubuddy",
+                "aim correction",
+                "skooter",
             });
 
         [BackgroundDependencyLoader]
@@ -59,17 +74,11 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
             Bindable<bool> aimAssist =
                 config.GetBindable<bool>(OsuSetting.AnarchyAimAssist);
 
-            Bindable<int> aimAssistSpeed =
-                config.GetBindable<int>(OsuSetting.AnarchyAimAssistSpeed);
+            Bindable<int> aimCorrectionStrength =
+                config.GetBindable<int>(OsuSetting.AnarchyAimCorrectionStrength);
 
-            Bindable<int> aimAssistStartingDistance =
-                config.GetBindable<int>(OsuSetting.AnarchyAimAssistStartingDistance);
-
-            Bindable<int> aimAssistStoppingDistance =
-                config.GetBindable<int>(OsuSetting.AnarchyAimAssistStoppingDistance);
-
-            Bindable<bool> aimAssistOnSliders =
-                config.GetBindable<bool>(OsuSetting.AnarchyAimAssistOnSliders);
+            Bindable<bool> aimCorrectionRelative =
+                config.GetBindable<bool>(OsuSetting.AnarchyAimCorrectionRelative);
 
             timewarpEnabled.BindValueChanged(
                 change => AnarchySettingsState.TimewarpEnabled = change.NewValue,
@@ -99,98 +108,83 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 change => AnarchySettingsState.AimAssist = change.NewValue,
                 true);
 
-            aimAssistSpeed.BindValueChanged(
-                change => AnarchySettingsState.AimAssistSpeed.Value = change.NewValue,
+            aimCorrectionStrength.BindValueChanged(
+                change => AnarchySettingsState.AimCorrectionStrength.Value = change.NewValue,
                 true);
 
-            aimAssistStartingDistance.BindValueChanged(
-                change => AnarchySettingsState.AimAssistStartingDistance.Value = change.NewValue,
-                true);
-
-            aimAssistStoppingDistance.BindValueChanged(
-                change => AnarchySettingsState.AimAssistStoppingDistance.Value = change.NewValue,
-                true);
-
-            aimAssistOnSliders.BindValueChanged(
-                change => AnarchySettingsState.AimAssistOnSliders = change.NewValue,
+            aimCorrectionRelative.BindValueChanged(
+                change => AnarchySettingsState.AimCorrectionRelative = change.NewValue,
                 true);
 
             Children = new Drawable[]
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "Relax",
+                    Caption = AnarchySettingsStrings.Relax,
+                    HintText = AnarchySettingsStrings.RelaxDescription,
                     Current = relax,
                 }),
 
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "Remove Hidden",
+                    Caption = AnarchySettingsStrings.RemoveHidden,
+                    HintText = AnarchySettingsStrings.RemoveHiddenDescription,
                     Current = removeHidden,
                 }),
 
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "Enable Timewarp",
+                    Caption = AnarchySettingsStrings.EnableTimewarp,
+                    HintText = AnarchySettingsStrings.EnableTimewarpDescription,
                     Current = timewarpEnabled,
                 }),
 
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "Timewarp rate",
+                    Caption = AnarchySettingsStrings.TimewarpRate,
+                    HintText = AnarchySettingsStrings.TimewarpRateDescription,
                     Current = timewarpRate,
                     KeyboardStep = 0.01f,
-                    LabelFormat = v => $"{v:0.00}x",
+                    LabelFormat = value => $"{value:0.00}x",
                 }),
 
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "Enable AR changer",
+                    Caption = AnarchySettingsStrings.EnableApproachRateChanger,
+                    HintText = AnarchySettingsStrings.EnableApproachRateChangerDescription,
                     Current = approachRateEnabled,
                 }),
 
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "Approach rate",
+                    Caption = AnarchySettingsStrings.ApproachRate,
+                    HintText = AnarchySettingsStrings.ApproachRateDescription,
                     Current = approachRate,
                     KeyboardStep = 0.1f,
-                    LabelFormat = v => $"AR {v:0.0}",
+                    LabelFormat = value => $"AR {value:0.0}",
                 }),
 
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "Aim assist",
+                    Caption = AnarchySettingsStrings.AimAssist,
+                    HintText = AnarchySettingsStrings.AimAssistDescription,
                     Current = aimAssist,
                 }),
 
                 new SettingsItemV2(new FormSliderBar<int>
                 {
-                    Caption = "Aim assist strength",
-                    Current = aimAssistSpeed,
+                    Caption = AnarchySettingsStrings.CorrectionStrength,
+                    HintText = AnarchySettingsStrings.CorrectionStrengthDescription,
+                    Current = aimCorrectionStrength,
                     KeyboardStep = 1,
-                    LabelFormat = v => $"{v}",
-                }),
-
-                new SettingsItemV2(new FormSliderBar<int>
-                {
-                    Caption = "Activation radius",
-                    Current = aimAssistStartingDistance,
-                    KeyboardStep = 1,
-                    LabelFormat = v => $"{v}px",
-                }),
-
-                new SettingsItemV2(new FormSliderBar<int>
-                {
-                    Caption = "Stop radius",
-                    Current = aimAssistStoppingDistance,
-                    KeyboardStep = 1,
-                    LabelFormat = v => $"{v}%",
+                    LabelFormat = value => $"{value}",
                 }),
 
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "Assist sliders",
-                    Current = aimAssistOnSliders,
+                    Caption = AnarchySettingsStrings.RelativeCorrection,
+                    HintText = AnarchySettingsStrings.RelativeCorrectionDescription,
+                    Current = aimCorrectionRelative,
                 }),
             };
         }

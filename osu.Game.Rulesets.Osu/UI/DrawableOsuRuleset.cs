@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -36,11 +35,6 @@ namespace osu.Game.Rulesets.Osu.UI
     {
         private Bindable<bool>? cursorHideEnabled;
 
-        private const uint mouseeventf_move = 0x0001;
-
-        [DllImport("user32.dll")]
-        private static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, UIntPtr dwExtraInfo);
-
         public new OsuInputManager KeyBindingInputManager =>
             (OsuInputManager)base.KeyBindingInputManager;
 
@@ -57,6 +51,8 @@ namespace osu.Game.Rulesets.Osu.UI
         private bool relaxIsDown;
         private bool relaxWasLeft;
         private double relaxLastStateChangeTime;
+
+        private DrawableHitCircle? lastAimCorrectedCircle;
 
         public DrawableOsuRuleset(
             Ruleset ruleset,
@@ -75,18 +71,22 @@ namespace osu.Game.Rulesets.Osu.UI
 
                 PlayfieldAdjustmentContainer.Add(
                     analysisOverlay =
-                        new ReplayAnalysisOverlay(replayPlayer.Score.Replay));
+                        new ReplayAnalysisOverlay(
+                            replayPlayer.Score.Replay));
 
                 Overlays.Add(
                     analysisOverlay.CreateProxy().With(
-                        p => p.Depth = float.NegativeInfinity));
+                        proxy =>
+                            proxy.Depth =
+                                float.NegativeInfinity));
 
                 replayPlayer.AddSettings(
                     new ReplayAnalysisSettings(Config));
 
                 cursorHideEnabled =
                     Config.GetBindable<bool>(
-                        OsuRulesetSetting.ReplayCursorHideEnabled);
+                        OsuRulesetSetting
+                            .ReplayCursorHideEnabled);
 
                 cursorHideEnabled.BindValueChanged(
                     enabled =>
@@ -101,7 +101,7 @@ namespace osu.Game.Rulesets.Osu.UI
             base.Update();
 
             updateAnarchyRelax();
-            updateAnarchyAimAssist();
+            updateAnarchyAimCorrection();
         }
 
         private void updateAnarchyRelax()
@@ -145,7 +145,8 @@ namespace osu.Game.Rulesets.Osu.UI
             double time = Playfield.Clock.CurrentTime;
 
             foreach (DrawableOsuHitObject drawable in
-                     Playfield.HitObjectContainer.AliveObjects
+                     Playfield.HitObjectContainer
+                              .AliveObjects
                               .OfType<DrawableOsuHitObject>())
             {
                 /*
@@ -159,7 +160,8 @@ namespace osu.Game.Rulesets.Osu.UI
                 }
 
                 /*
-                 * Already judged, or beyond the object's hittable duration.
+                 * Already judged, or beyond the object's
+                 * hittable duration.
                  */
                 if (drawable.IsHit ||
                     drawable.HitObject is IHasDuration duration &&
@@ -182,15 +184,15 @@ namespace osu.Game.Rulesets.Osu.UI
                             handleHitCircle(slider.HeadCircle);
 
                         requiresHold |=
-                            slider.SliderInputManager.IsMouseInFollowArea(
-                                slider.Tracking.Value);
+                            slider.SliderInputManager
+                                  .IsMouseInFollowArea(
+                                      slider.Tracking.Value);
 
                         break;
 
                     case DrawableSpinner spinner:
                         requiresHold |=
                             spinner.HitObject.SpinsRequired > 0;
-
                         break;
                 }
             }
@@ -212,12 +214,15 @@ namespace osu.Game.Rulesets.Osu.UI
                 changeRelaxState(false, time);
             }
 
-            void handleHitCircle(DrawableHitCircle circle)
+            void handleHitCircle(
+                DrawableHitCircle circle)
             {
                 if (!circle.HitArea.IsHovered)
                     return;
 
-                double hitTime = circle.HitObject.StartTime + relax_hit_offset;
+                double hitTime =
+                    circle.HitObject.StartTime +
+                    relax_hit_offset;
 
                 if (time < hitTime)
                     return;
@@ -227,123 +232,172 @@ namespace osu.Game.Rulesets.Osu.UI
 
                 requiresHit |=
                     circle.HitObject.HitWindows.CanBeHit(
-                        time - circle.HitObject.StartTime);
+                        time -
+                        circle.HitObject.StartTime);
             }
         }
 
-        private void updateAnarchyAimAssist()
+        private void updateAnarchyAimCorrection()
         {
             if (!AnarchySettingsState.AimAssist)
+            {
+                lastAimCorrectedCircle = null;
                 return;
+            }
 
             if (KeyBindingInputManager.ReplayInputHandler != null)
+            {
+                lastAimCorrectedCircle = null;
                 return;
+            }
 
             double time = Playfield.Clock.CurrentTime;
 
-            var objects =
+            DrawableOsuHitObject? target =
                 Playfield.HitObjectContainer.AliveObjects
-                        .OfType<DrawableOsuHitObject>()
-                        .Where(drawable => !drawable.IsHit)
-                        .Where(drawable => time <= getEndTime(drawable))
-                        .OrderBy(drawable => drawable.HitObject.StartTime)
-                        .ToList();
+                         .OfType<DrawableOsuHitObject>()
+                         .Where(drawable => !drawable.IsHit)
+                         .OrderBy(drawable => drawable.HitObject.StartTime)
+                         .FirstOrDefault();
 
-            if (objects.Count == 0)
+            if (target == null || target is DrawableSpinner)
+                return;
+
+            DrawableHitCircle? targetCircle = getJudgementCircle(target);
+
+            if (lastAimCorrectedCircle?.IsHit == true)
+                lastAimCorrectedCircle = null;
+
+            if (targetCircle == null || targetCircle.IsHit)
+                return;
+
+            if (targetCircle == lastAimCorrectedCircle)
                 return;
 
             /*
-            * In lazer, AliveObjects is not the same as stable's currentHitObjectIndex.
-            * Always targeting the first unhit object is safer and avoids AA pulling away before the current note is judged.
-            */
-            DrawableOsuHitObject target = objects[0];
-
-            if (target is DrawableSpinner)
-                return;
-
-            if (target is DrawableSlider && !AnarchySettingsState.AimAssistOnSliders)
-                return;
-
-            if (target.HitObject.StartTime - time >= 240)
+             * Stable Skooter performs correction immediately around the hit time,
+             * rather than throughout the complete early hittable window.
+             */
+            if (targetCircle.HitObject.StartTime - time >= 12)
                 return;
 
             Vector2 cursorPosition =
                 Playfield.ToLocalSpace(
                     KeyBindingInputManager.CurrentState.Mouse.Position);
 
-            Vector2 targetPosition = getTargetPosition(target);
-
-            float distance = Vector2.Distance(cursorPosition, targetPosition);
-
-            int startingDistance = AnarchySettingsState.AimAssistStartingDistance.Value;
-            int stoppingDistance = AnarchySettingsState.AimAssistStoppingDistance.Value;
-            int speed = AnarchySettingsState.AimAssistSpeed.Value;
-
-            if (distance >= startingDistance)
-                return;
-
-            float hitObjectRadius = (float)target.HitObject.Radius;
-            float stopRadius = hitObjectRadius * stoppingDistance / 100f;
-
-            if (distance <= stopRadius)
-                return;
-
-            Vector2 delta = targetPosition - cursorPosition;
-
-            if (delta.LengthSquared <= 0)
-                return;
-
-            float step =
-                Math.Clamp(
-                    distance / (5f - speed / 10f) / 10f,
-                    0f,
-                    5f);
-
-            Vector2 movement =
-                Vector2.Normalize(delta) *
-                Math.Min(step, distance);
-
             /*
-            * Stable calculates movement in gamefield units and passes it directly to MoveMouseBy().
-            * Do NOT convert to screen-space here.
-            */
-            if (OperatingSystem.IsWindows())
-            {
-                mouse_event(
-                    mouseeventf_move,
-                    (int)Math.Round(movement.X),
-                    (int)Math.Round(movement.Y),
-                    0,
-                    UIntPtr.Zero);
-            }
-            else
-            {
-                Vector2 nextPosition = cursorPosition + movement;
+             * Equivalent to stable's:
+             *
+             * FindCircleAt(x, y, hittableRangeOnly: true) == null
+             *
+             * Do not correct if the cursor is already over a hittable circle.
+             */
+            if (isCursorOverHittableCircle(cursorPosition, time))
+                return;
 
-                new MousePositionAbsoluteInput
+            float correctionRange =
+                AnarchySettingsState.AimCorrectionStrength.Value;
+
+            if (AnarchySettingsState.AimCorrectionRelative)
+            {
+                correctionRange +=
+                    (float)targetCircle.HitObject.Radius + 1;
+            }
+
+            correctionRange = Math.Min(correctionRange, 60f);
+
+            if (Vector2.Distance(cursorPosition, targetCircle.Position) >
+                correctionRange)
+            {
+                return;
+            }
+
+            lastAimCorrectedCircle = targetCircle;
+
+            KeyBindingInputManager.ApplyAimCorrection(
+                Playfield.ToScreenSpace(targetCircle.Position));
+        }
+
+        private bool isCursorOverHittableCircle(
+            Vector2 cursorPosition,
+            double currentTime)
+        {
+            foreach (DrawableOsuHitObject drawable in
+                     Playfield.HitObjectContainer
+                              .AliveObjects
+                              .OfType<DrawableOsuHitObject>())
+            {
+                DrawableHitCircle? circle =
+                    getJudgementCircle(drawable);
+
+                if (circle == null)
+                    continue;
+
+                if (!isCircleHittable(
+                        circle,
+                        currentTime))
                 {
-                    Position = Playfield.ToScreenSpace(nextPosition)
-                }.Apply(
-                    KeyBindingInputManager.CurrentState,
-                    KeyBindingInputManager);
+                    continue;
+                }
+
+                float distance =
+                    Vector2.Distance(
+                        cursorPosition,
+                        circle.Position);
+
+                if (distance <=
+                    circle.HitObject.Radius)
+                {
+                    return true;
+                }
             }
 
-            static double getEndTime(DrawableOsuHitObject drawable)
-                => drawable.HitObject is IHasDuration duration
-                    ? duration.EndTime
-                    : drawable.HitObject.StartTime;
+            return false;
+        }
 
-            static Vector2 getTargetPosition(DrawableOsuHitObject drawable)
-                => drawable.Position;
+        private static DrawableHitCircle?
+            getJudgementCircle(
+                DrawableOsuHitObject drawable)
+        {
+            return drawable switch
+            {
+                DrawableHitCircle circle =>
+                    circle,
+
+                DrawableSlider slider
+                    when !slider.HeadCircle.IsHit =>
+                    slider.HeadCircle,
+
+                _ => null,
+            };
+        }
+
+        private static bool isCircleHittable(
+            DrawableHitCircle circle,
+            double currentTime)
+        {
+            if (circle.IsHit)
+                return false;
+
+            if (circle.HitObject.HitWindows == null)
+                return false;
+
+            return circle.HitObject
+                         .HitWindows
+                         .CanBeHit(
+                             currentTime -
+                             circle.HitObject.StartTime);
         }
 
         private void enableAnarchyRelax()
         {
             /*
-             * Prevent physical keyboard/mouse tapping from being sent as
-             * gameplay input while hidden Relax is active.
+             * Prevent physical keyboard/mouse tapping from
+             * being sent as gameplay input while hidden
+             * Relax is active.
              */
-            KeyBindingInputManager.AllowGameplayInputs = false;
+            KeyBindingInputManager.AllowGameplayInputs =
+                false;
 
             /*
              * Start from a released input state.
@@ -354,14 +408,18 @@ namespace osu.Game.Rulesets.Osu.UI
         private void disableAnarchyRelax()
         {
             /*
-             * Release any generated key before restoring normal tapping.
+             * Release any generated key before restoring
+             * normal tapping.
              */
             releaseRelaxInput();
 
-            KeyBindingInputManager.AllowGameplayInputs = true;
+            KeyBindingInputManager.AllowGameplayInputs =
+                true;
         }
 
-        private void changeRelaxState(bool down, double time)
+        private void changeRelaxState(
+            bool down,
+            double time)
         {
             if (relaxIsDown == down)
                 return;
@@ -371,7 +429,8 @@ namespace osu.Game.Rulesets.Osu.UI
 
             var state = new ReplayState<OsuAction>
             {
-                PressedActions = new List<OsuAction>()
+                PressedActions =
+                    new List<OsuAction>()
             };
 
             if (down)
@@ -398,7 +457,8 @@ namespace osu.Game.Rulesets.Osu.UI
 
             var state = new ReplayState<OsuAction>
             {
-                PressedActions = new List<OsuAction>()
+                PressedActions =
+                    new List<OsuAction>()
             };
 
             state.Apply(
@@ -407,7 +467,8 @@ namespace osu.Game.Rulesets.Osu.UI
         }
 
         public override DrawableHitObject<OsuHitObject>?
-            CreateDrawableRepresentation(OsuHitObject h) => null;
+            CreateDrawableRepresentation(
+                OsuHitObject hitObject) => null;
 
         public override bool ReceivePositionalInputAt(
             Vector2 screenSpacePos) => true;
@@ -415,8 +476,10 @@ namespace osu.Game.Rulesets.Osu.UI
         protected override Playfield CreatePlayfield() =>
             new OsuPlayfield();
 
-        protected override PassThroughInputManager CreateInputManager() =>
-            new OsuInputManager(Ruleset.RulesetInfo);
+        protected override PassThroughInputManager
+            CreateInputManager() =>
+                new OsuInputManager(
+                    Ruleset.RulesetInfo);
 
         public override PlayfieldAdjustmentContainer
             CreatePlayfieldAdjustmentContainer() =>
@@ -425,10 +488,13 @@ namespace osu.Game.Rulesets.Osu.UI
                     AlignWithStoryboard = true
                 };
 
-        protected override ResumeOverlay CreateResumeOverlay()
+        protected override ResumeOverlay
+            CreateResumeOverlay()
         {
             if (Mods.Any(
-                    m => m is OsuModAutopilot or OsuModTouchDevice))
+                    mod =>
+                        mod is OsuModAutopilot
+                            or OsuModTouchDevice))
             {
                 return new DelayedResumeOverlay
                 {
@@ -439,22 +505,28 @@ namespace osu.Game.Rulesets.Osu.UI
             return new OsuResumeOverlay();
         }
 
-        protected override ReplayInputHandler CreateReplayInputHandler(
-            Replay replay) =>
-                new OsuFramedReplayInputHandler(replay);
+        protected override ReplayInputHandler
+            CreateReplayInputHandler(
+                Replay replay) =>
+                    new OsuFramedReplayInputHandler(
+                        replay);
 
-        protected override ReplayRecorder CreateReplayRecorder(
-            Score score) =>
-                new OsuReplayRecorder(score);
+        protected override ReplayRecorder
+            CreateReplayRecorder(
+                Score score) =>
+                    new OsuReplayRecorder(score);
 
         public override double GameplayStartTime
         {
             get
             {
-                if (Objects.FirstOrDefault() is OsuHitObject first)
+                if (Objects.FirstOrDefault()
+                    is OsuHitObject first)
                 {
                     return first.StartTime -
-                           Math.Max(2000, first.TimePreempt);
+                           Math.Max(
+                               2000,
+                               first.TimePreempt);
                 }
 
                 return 0;

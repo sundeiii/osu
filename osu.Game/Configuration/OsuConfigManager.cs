@@ -200,7 +200,6 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.AnarchyApproachRateEnabled, false);
 
-
             SetDefault(
                 OsuSetting.AnarchyApproachRate,
                 -1.0,
@@ -208,12 +207,10 @@ namespace osu.Game.Configuration
                 11.0,
                 0.1);
 
-
             SetDefault(OsuSetting.AnarchyAimAssist, false);
-            SetDefault(OsuSetting.AnarchyAimAssistSpeed, 5, 1, 11);
-            SetDefault(OsuSetting.AnarchyAimAssistStartingDistance, 66, 0, 66);
-            SetDefault(OsuSetting.AnarchyAimAssistStoppingDistance, 30, 0, 66);
-            SetDefault(OsuSetting.AnarchyAimAssistOnSliders, false);
+            SetDefault(OsuSetting.AnarchyAimCorrectionStrength, 30, 0, 60);
+            SetDefault(OsuSetting.AnarchyAimCorrectionRelative, false);
+
             // Initialise the runtime state from saved config values,
             // and keep it synchronised if config changes.
             GetBindable<bool>(OsuSetting.AnarchyRelax).BindValueChanged(
@@ -236,20 +233,12 @@ namespace osu.Game.Configuration
                 change => AnarchySettingsState.AimAssist = change.NewValue,
                 true);
 
-            GetBindable<int>(OsuSetting.AnarchyAimAssistSpeed).BindValueChanged(
-                change => AnarchySettingsState.AimAssistSpeed.Value = change.NewValue,
+            GetBindable<int>(OsuSetting.AnarchyAimCorrectionStrength).BindValueChanged(
+                change => AnarchySettingsState.AimCorrectionStrength.Value = change.NewValue,
                 true);
 
-            GetBindable<int>(OsuSetting.AnarchyAimAssistStartingDistance).BindValueChanged(
-                change => AnarchySettingsState.AimAssistStartingDistance.Value = change.NewValue,
-                true);
-
-            GetBindable<int>(OsuSetting.AnarchyAimAssistStoppingDistance).BindValueChanged(
-                change => AnarchySettingsState.AimAssistStoppingDistance.Value = change.NewValue,
-                true);
-
-            GetBindable<bool>(OsuSetting.AnarchyAimAssistOnSliders).BindValueChanged(
-                change => AnarchySettingsState.AimAssistOnSliders = change.NewValue,
+            GetBindable<bool>(OsuSetting.AnarchyAimCorrectionRelative).BindValueChanged(
+                change => AnarchySettingsState.AimCorrectionRelative = change.NewValue,
                 true);
 
             // Update
@@ -521,10 +510,8 @@ namespace osu.Game.Configuration
         AnarchyApproachRateEnabled,
         AnarchyApproachRate,
         AnarchyAimAssist,
-        AnarchyAimAssistSpeed,
-        AnarchyAimAssistStartingDistance,
-        AnarchyAimAssistStoppingDistance,
-        AnarchyAimAssistOnSliders,
+        AnarchyAimCorrectionStrength,
+        AnarchyAimCorrectionRelative,
         Scaling,
         ScalingPositionX,
         ScalingPositionY,
