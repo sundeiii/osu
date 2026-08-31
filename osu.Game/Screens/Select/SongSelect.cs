@@ -613,7 +613,11 @@ namespace osu.Game.Screens.Select
                 if (Beatmap.Value.BeatmapInfo.Equals(debounceQueuedSelection))
                     return;
 
-                Beatmap.Value = beatmaps.GetWorkingBeatmap(debounceQueuedSelection);
+                var workingBeatmap = beatmaps.GetWorkingBeatmap(debounceQueuedSelection);
+                if (!checkBeatmapValidForSelection(workingBeatmap.BeatmapInfo))
+                    return;
+
+                Beatmap.Value = workingBeatmap;
             }
             finally
             {
@@ -1058,13 +1062,9 @@ namespace osu.Game.Screens.Select
 
             CarouselItemsPresented = true;
 
-            int count = carousel.MatchedBeatmapsCount;
-
             updateNoResultsPlaceholder();
 
-            // Intentionally not localised until we have proper support for this (see https://github.com/ppy/osu-framework/pull/4918
-            // but also in this case we want support for formatting a number within a string).
-            FilterControl.StatusText = count != 1 ? $"{count:#,0} matches" : $"{count:#,0} match";
+            FilterControl.StatusText = SongSelectStrings.MatchesCount(carousel.MatchedBeatmapsCount);
 
             // If there's already a selection update in progress, let's not interrupt it.
             // Interrupting could cause the debounce interval to be reduced.
@@ -1354,7 +1354,7 @@ namespace osu.Game.Screens.Select
 
         #region Implementation of ISongSelect
 
-        void ISongSelect.Search(string query) => FilterControl.Search(query);
+        void ISongSelect.AddToSearch(string query) => FilterControl.AddToSearch(query);
 
         bool ISongSelect.CanPresentScore => true;
 
@@ -1381,6 +1381,7 @@ namespace osu.Game.Screens.Select
 
         void IHandlePresentBeatmap.PresentBeatmap(WorkingBeatmap workingBeatmap, RulesetInfo ruleset)
         {
+            unscopeBeatmapSet(restorePreviousSelection: false);
             cancelDebounceSelection();
 
             var beatmapInfo = workingBeatmap.BeatmapInfo;
@@ -1454,11 +1455,7 @@ namespace osu.Game.Screens.Select
 
         public void Delete(BeatmapSetInfo beatmapSet) => dialogOverlay?.Push(new BeatmapDeleteDialog(beatmapSet));
 
-        public void RestoreAllHidden(BeatmapSetInfo beatmapSet)
-        {
-            foreach (var b in beatmapSet.Beatmaps)
-                beatmaps.Restore(b);
-        }
+        public void RestoreAllHidden(BeatmapSetInfo beatmapSet) => beatmaps.Restore(beatmapSet);
 
         private GroupedBeatmap? beforeScopedSelection;
 
@@ -1472,12 +1469,14 @@ namespace osu.Game.Screens.Select
             scopedBeatmapSet.Value = beatmapSet;
         }
 
-        public void UnscopeBeatmapSet()
+        public void UnscopeBeatmapSet() => unscopeBeatmapSet(restorePreviousSelection: true);
+
+        private void unscopeBeatmapSet(bool restorePreviousSelection)
         {
             if (scopedBeatmapSet.Value == null)
                 return;
 
-            if (beforeScopedSelection != null)
+            if (beforeScopedSelection != null && restorePreviousSelection)
                 queueBeatmapSelection(beforeScopedSelection);
 
             scopedBeatmapSet.Value = null;
