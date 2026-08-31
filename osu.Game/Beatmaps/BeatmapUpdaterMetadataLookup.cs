@@ -59,7 +59,7 @@ namespace osu.Game.Beatmaps
                     Logger.Log(
                         $"g0v0 metadata lookup failed for {beatmapInfo.Metadata.Artist} - {beatmapInfo.Metadata.Title}; preserving existing online info.",
                         LoggingTarget.Runtime,
-                        LogLevel.Important
+                        LogLevel.Verbose
                     );
 
                     // A lookup failure is not proof that the map does not exist.
@@ -73,7 +73,7 @@ namespace osu.Game.Beatmaps
                     Logger.Log(
                         $"g0v0 metadata returned no matching beatmap for {beatmapInfo.Metadata.Artist} - {beatmapInfo.Metadata.Title}; marking it as unknown while preserving its online ID.",
                         LoggingTarget.Runtime,
-                        LogLevel.Important
+                        LogLevel.Verbose
                     );
 
                     // Keep the ID imported from the .osu file. Rinari may learn
