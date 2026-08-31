@@ -17,9 +17,11 @@ jobs:
         uses: actions/checkout@v6
         
       - name: Checkout custom osu-resources
-        shell: bash
-        run: |
-          git clone https://github.com/sundeiii/rinari-resources.git ../osu-resources
+        uses: actions/checkout@v4
+        with:
+          repository: sundeiii/rinari-resources
+          path: ../osu-resources
+          token: ${{ secrets.RINARI_RESOURCES_TOKEN }}
 
       - name: Install .NET 8.0.x
         uses: actions/setup-dotnet@v5
@@ -84,9 +86,11 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Checkout custom osu-resources
-        shell: bash
-        run: |
-          git clone https://github.com/sundeiii/rinari-resources.git ../osu-resources
+        uses: actions/checkout@v4
+        with:
+          repository: sundeiii/rinari-resources
+          path: ../osu-resources
+          token: ${{ secrets.RINARI_RESOURCES_TOKEN }}
 
       - name: Install .NET 8.0.x
         uses: actions/setup-dotnet@v5
@@ -156,9 +160,11 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Checkout custom osu-resources
-        shell: bash
-        run: |
-          git clone https://github.com/sundeiii/rinari-resources.git ../osu-resources
+        uses: actions/checkout@v4
+        with:
+          repository: sundeiii/rinari-resources
+          path: ../osu-resources
+          token: ${{ secrets.RINARI_RESOURCES_TOKEN }}
 
       - name: Setup JDK 11
         uses: actions/setup-java@v5
@@ -186,9 +192,11 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Checkout custom osu-resources
-        shell: bash
-        run: |
-          git clone https://github.com/sundeiii/rinari-resources.git ../osu-resources
+        uses: actions/checkout@v4
+        with:
+          repository: sundeiii/rinari-resources
+          path: ../osu-resources
+          token: ${{ secrets.RINARI_RESOURCES_TOKEN }}
 
       - name: Install .NET 8.0.x
         uses: actions/setup-dotnet@v5
