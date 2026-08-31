@@ -319,7 +319,7 @@ namespace osu.Game
             largeStore.AddTextureSource(Host.CreateTextureLoaderStore(CreateOnlineStore()));
             dependencies.Cache(largeStore);
 
-            dependencies.Cache(onlineAssetStore = new OnlineAssetCachingStore(Host, realm));
+            dependencies.Cache(onlineAssetStore = new OnlineAssetCachingStore(Host, realm, LocalConfig));
 
             dependencies.CacheAs(LocalConfig);
             dependencies.CacheAs<IGameplaySettings>(LocalConfig);
@@ -835,3 +835,4 @@ namespace osu.Game
         ChannelAmplitudes IHasAmplitudes.CurrentAmplitudes => Beatmap.Value.TrackLoaded ? Beatmap.Value.Track.CurrentAmplitudes : ChannelAmplitudes.Empty;
     }
 }
+
