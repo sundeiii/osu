@@ -57,25 +57,29 @@ namespace osu.Game.Beatmaps
                 if (!tryLookup(beatmapInfo, preferOnlineFetch, out var res))
                 {
                     Logger.Log(
-                        $"g0v0 metadata lookup failed for {beatmapInfo.Metadata.Artist} - {beatmapInfo.Metadata.Title}; resetting online info.",
+                        $"g0v0 metadata lookup failed for {beatmapInfo.Metadata.Artist} - {beatmapInfo.Metadata.Title}; preserving existing online info.",
                         LoggingTarget.Runtime,
                         LogLevel.Important
                     );
 
-                    beatmapInfo.ResetOnlineInfo();
-                    lookupResults.Add(null);
-                    continue;
+                    // A lookup failure is not proof that the map does not exist.
+                    // Preserve the existing online linkage so it can be retried or
+                    // repaired by the Rinari status synchroniser later.
+                    return;
                 }
 
                 if (res == null)
                 {
                     Logger.Log(
-                        $"g0v0 metadata returned null for {beatmapInfo.Metadata.Artist} - {beatmapInfo.Metadata.Title}; resetting online info.",
+                        $"g0v0 metadata returned no matching beatmap for {beatmapInfo.Metadata.Artist} - {beatmapInfo.Metadata.Title}; marking it as unknown while preserving its online ID.",
                         LoggingTarget.Runtime,
                         LogLevel.Important
                     );
 
-                    beatmapInfo.ResetOnlineInfo();
+                    // Keep the ID imported from the .osu file. Rinari may learn
+                    // about this beatmap later, and the manual status synchroniser
+                    // needs the ID in order to repair it.
+                    beatmapInfo.ResetOnlineInfo(resetOnlineId: false);
                     lookupResults.Add(null);
                     continue;
                 }
@@ -103,7 +107,6 @@ namespace osu.Game.Beatmaps
             {
                 beatmapSet.Status = BeatmapOnlineStatus.None;
                 beatmapSet.DateRanked = null;
-                beatmapSet.DateSubmitted = null;
                 return;
             }
 

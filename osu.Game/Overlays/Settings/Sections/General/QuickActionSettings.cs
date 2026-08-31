@@ -45,6 +45,15 @@ namespace osu.Game.Overlays.Settings.Sections.General
 
         private bool statusSyncRunning;
 
+        private class RinariBeatmapStatus
+        {
+            [JsonPropertyName("id")]
+            public int Id { get; set; }
+
+            [JsonPropertyName("status")]
+            public string Status { get; set; } = string.Empty;
+        }
+
         private class RinariBeatmapSetStatus
         {
             [JsonPropertyName("id")]
@@ -52,6 +61,10 @@ namespace osu.Game.Overlays.Settings.Sections.General
 
             [JsonPropertyName("status")]
             public string Status { get; set; } = string.Empty;
+
+            [JsonPropertyName("beatmaps")]
+            public RinariBeatmapStatus[] Beatmaps { get; set; } =
+                Array.Empty<RinariBeatmapStatus>();
         }
 
         protected override LocalisableString Header => GeneralSettingsStrings.QuickActionsHeader;
@@ -132,89 +145,163 @@ namespace osu.Game.Overlays.Settings.Sections.General
             {
                 using var http = new HttpClient();
 
-                string json = await http.GetStringAsync("https://lazer-api.rinarii.de/api/v2/rinari/beatmapset-statuses").ConfigureAwait(false);
+                string json = await http.GetStringAsync(
+                    "https://lazer-api.rinarii.de/api/v2/rinari/beatmapset-statuses"
+                ).ConfigureAwait(false);
 
-                var serverStatuses = JsonSerializer.Deserialize<RinariBeatmapSetStatus[]>(json) ?? Array.Empty<RinariBeatmapSetStatus>();
+                var serverStatuses =
+                    JsonSerializer.Deserialize<RinariBeatmapSetStatus[]>(json)
+                    ?? Array.Empty<RinariBeatmapSetStatus>();
 
-                Dictionary<int, BeatmapOnlineStatus> statusBySetId = new Dictionary<int, BeatmapOnlineStatus>();
+                Dictionary<int, BeatmapOnlineStatus> statusBySetId = new();
+                Dictionary<int, BeatmapOnlineStatus> statusByBeatmapId = new();
 
                 foreach (var item in serverStatuses)
                 {
-                    if (Enum.TryParse(item.Status, true, out BeatmapOnlineStatus parsedStatus))
-                        statusBySetId[item.Id] = parsedStatus;
+                    if (Enum.TryParse(
+                            item.Status,
+                            true,
+                            out BeatmapOnlineStatus parsedSetStatus))
+                    {
+                        statusBySetId[item.Id] = parsedSetStatus;
+                    }
+
+                    foreach (var beatmap in item.Beatmaps)
+                    {
+                        if (Enum.TryParse(
+                                beatmap.Status,
+                                true,
+                                out BeatmapOnlineStatus parsedBeatmapStatus))
+                        {
+                            statusByBeatmapId[beatmap.Id] = parsedBeatmapStatus;
+                        }
+                    }
                 }
 
                 Schedule(() =>
                 {
-                    int online = 0;
-                    int missing = 0;
-                    int updatedBeatmapSets = 0;
-                    int updatedBeatmaps = 0;
-
-                    realm.Write(r =>
+                    try
                     {
-                        foreach (var beatmapSet in r.All<BeatmapSetInfo>().Where(s => s.OnlineID > 0).AsEnumerable())
+                        int onlineSets = 0;
+                        int missingSets = 0;
+                        int skippedSets = 0;
+                        int onlineBeatmaps = 0;
+                        int missingBeatmaps = 0;
+                        int updatedBeatmapSets = 0;
+                        int updatedBeatmaps = 0;
+
+                        realm.Write(r =>
                         {
-                            BeatmapOnlineStatus newStatus;
-
-                            if (statusBySetId.TryGetValue(beatmapSet.OnlineID, out var serverStatus))
+                            foreach (var beatmapSet in r.All<BeatmapSetInfo>().AsEnumerable())
                             {
-                                newStatus = serverStatus;
-                                online++;
+                                int setId = beatmapSet.OnlineID;
 
-                                lock (SongSelect.MissingServerBeatmapSets)
-                                    SongSelect.MissingServerBeatmapSets.Remove(beatmapSet.OnlineID);
-                            }
-                            else
-                            {
-                                newStatus = BeatmapOnlineStatus.None;
-                                missing++;
-
-                                lock (SongSelect.MissingServerBeatmapSets)
-                                    SongSelect.MissingServerBeatmapSets.Add(beatmapSet.OnlineID);
-                            }
-
-                            if (beatmapSet.Status != newStatus)
-                            {
-                                beatmapSet.Status = newStatus;
-                                updatedBeatmapSets++;
-                            }
-
-                            if (newStatus == BeatmapOnlineStatus.None)
-                            {
-                                beatmapSet.DateRanked = null;
-                                beatmapSet.DateSubmitted = null;
-                            }
-
-                            foreach (var beatmap in beatmapSet.Beatmaps)
-                            {
-                                if (beatmap.Status != newStatus)
+                                if (setId <= 0)
                                 {
-                                    beatmap.Status = newStatus;
-                                    updatedBeatmaps++;
+                                    skippedSets++;
+                                    continue;
+                                }
+
+                                BeatmapOnlineStatus setStatus;
+
+                                if (statusBySetId.TryGetValue(setId, out var serverSetStatus))
+                                {
+                                    setStatus = serverSetStatus;
+                                    onlineSets++;
+
+                                    lock (SongSelect.MissingServerBeatmapSets)
+                                        SongSelect.MissingServerBeatmapSets.Remove(setId);
+                                }
+                                else
+                                {
+                                    setStatus = BeatmapOnlineStatus.None;
+                                    missingSets++;
+
+                                    lock (SongSelect.MissingServerBeatmapSets)
+                                        SongSelect.MissingServerBeatmapSets.Add(setId);
+                                }
+
+                                if (beatmapSet.Status != setStatus)
+                                {
+                                    beatmapSet.Status = setStatus;
+                                    updatedBeatmapSets++;
+                                }
+
+                                if (setStatus == BeatmapOnlineStatus.None)
+                                    beatmapSet.DateRanked = null;
+
+                                foreach (var beatmap in beatmapSet.Beatmaps)
+                                {
+                                    BeatmapOnlineStatus beatmapStatus;
+
+                                    if (setStatus == BeatmapOnlineStatus.None)
+                                    {
+                                        beatmapStatus = BeatmapOnlineStatus.None;
+                                        missingBeatmaps++;
+                                    }
+                                    else if (beatmap.OnlineID > 0
+                                             && statusByBeatmapId.TryGetValue(
+                                                 beatmap.OnlineID,
+                                                 out var serverBeatmapStatus))
+                                    {
+                                        beatmapStatus = serverBeatmapStatus;
+                                        onlineBeatmaps++;
+                                    }
+                                    else
+                                    {
+                                        beatmapStatus = BeatmapOnlineStatus.None;
+                                        missingBeatmaps++;
+                                    }
+
+                                    if (beatmap.Status != beatmapStatus)
+                                    {
+                                        beatmap.Status = beatmapStatus;
+                                        updatedBeatmaps++;
+                                    }
                                 }
                             }
-                        }
-                    });
+                        });
 
-                    notification.CompletionText = $"Rinari status sync finished. Online: {online}, missing: {missing}, updated sets: {updatedBeatmapSets}, updated maps: {updatedBeatmaps}.";
-                    notification.Progress = 1;
-                    notification.State = ProgressNotificationState.Completed;
+                        notification.CompletionText =
+                            $"Rinari status sync finished. " +
+                            $"Sets: {onlineSets} online, {missingSets} missing, {skippedSets} without ID. " +
+                            $"Beatmaps: {onlineBeatmaps} online, {missingBeatmaps} missing. " +
+                            $"Updated: {updatedBeatmapSets} sets, {updatedBeatmaps} beatmaps.";
+
+                        notification.Progress = 1;
+                        notification.State = ProgressNotificationState.Completed;
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log(
+                            $"Rinari beatmap status Realm sync failed: {e}",
+                            LoggingTarget.Runtime,
+                            LogLevel.Important
+                        );
+
+                        notification.Text = "Rinari beatmap status sync failed.";
+                        notification.State = ProgressNotificationState.Cancelled;
+                    }
+                    finally
+                    {
+                        statusSyncRunning = false;
+                    }
                 });
             }
             catch (Exception e)
             {
-                Logger.Log($"Rinari beatmap status sync failed: {e}", LoggingTarget.Runtime, LogLevel.Important);
+                Logger.Log(
+                    $"Rinari beatmap status sync failed: {e}",
+                    LoggingTarget.Runtime,
+                    LogLevel.Important
+                );
 
                 Schedule(() =>
                 {
                     notification.Text = "Rinari beatmap status sync failed.";
                     notification.State = ProgressNotificationState.Cancelled;
+                    statusSyncRunning = false;
                 });
-            }
-            finally
-            {
-                statusSyncRunning = false;
             }
         }
 
