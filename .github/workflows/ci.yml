@@ -20,8 +20,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: sundeiii/rinari-resources
-          path: ../osu-resources
+          path: rinari-resources-temp
           token: ${{ secrets.RINARI_RESOURCES_TOKEN }}
+
+      - name: Move custom osu-resources
+        shell: bash
+        run: |
+          rm -rf ../osu-resources
+          mv rinari-resources-temp ../osu-resources
 
       - name: Install .NET 8.0.x
         uses: actions/setup-dotnet@v5
@@ -89,8 +95,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: sundeiii/rinari-resources
-          path: ../osu-resources
+          path: rinari-resources-temp
           token: ${{ secrets.RINARI_RESOURCES_TOKEN }}
+
+      - name: Move custom osu-resources
+        shell: bash
+        run: |
+          rm -rf ../osu-resources
+          mv rinari-resources-temp ../osu-resources
 
       - name: Install .NET 8.0.x
         uses: actions/setup-dotnet@v5
@@ -163,8 +175,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: sundeiii/rinari-resources
-          path: ../osu-resources
+          path: rinari-resources-temp
           token: ${{ secrets.RINARI_RESOURCES_TOKEN }}
+
+      - name: Move custom osu-resources
+        shell: bash
+        run: |
+          rm -rf ../osu-resources
+          mv rinari-resources-temp ../osu-resources
 
       - name: Setup JDK 11
         uses: actions/setup-java@v5
@@ -195,8 +213,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: sundeiii/rinari-resources
-          path: ../osu-resources
+          path: rinari-resources-temp
           token: ${{ secrets.RINARI_RESOURCES_TOKEN }}
+
+      - name: Move custom osu-resources
+        shell: bash
+        run: |
+          rm -rf ../osu-resources
+          mv rinari-resources-temp ../osu-resources
 
       - name: Install .NET 8.0.x
         uses: actions/setup-dotnet@v5
