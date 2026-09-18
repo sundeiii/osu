@@ -183,10 +183,19 @@ namespace osu.Game.Rulesets.Osu.UI
                         if (!slider.HeadCircle.IsHit)
                             handleHitCircle(slider.HeadCircle);
 
-                        requiresHold |=
-                            slider.SliderInputManager
-                                  .IsMouseInFollowArea(
-                                      slider.Tracking.Value);
+                        /*
+                         * Holding presses the key, which would hit the slider
+                         * head early, so only hold once the hit time is reached.
+                         */
+                        if (time >=
+                            slider.HitObject.StartTime +
+                            relax_hit_offset)
+                        {
+                            requiresHold |=
+                                slider.SliderInputManager
+                                      .IsMouseInFollowArea(
+                                          slider.Tracking.Value);
+                        }
 
                         break;
 
