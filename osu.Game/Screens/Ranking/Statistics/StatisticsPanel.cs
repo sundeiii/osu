@@ -24,6 +24,7 @@ using osu.Game.Online.API;
 using osu.Game.Online.Placeholders;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
+using osu.Game.Screens.Ranking.Statistics.Session;
 using osu.Game.Screens.Ranking.Statistics.User;
 using osuTK;
 using Realms;
@@ -226,6 +227,9 @@ namespace osu.Game.Screens.Ranking.Statistics
                     Origin = Anchor.Centre,
                 });
             }
+
+            if (AchievedScore != null && newScore.Equals(AchievedScore))
+                yield return new StatisticItem("Session", () => new SessionStatsDisplay());
 
             if (newScore.BeatmapInfo!.OnlineID > 0
                 && api.IsLoggedIn)

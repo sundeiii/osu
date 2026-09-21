@@ -32,6 +32,7 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osu.Game.Screens.Ranking.Statistics;
+using osu.Game.Screens.Ranking.Statistics.Session;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -63,6 +64,9 @@ namespace osu.Game.Screens.Ranking
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
+
+        [Resolved]
+        private SessionStatsStore? sessionStats { get; set; }
 
         private bool skipExitTransition;
 
@@ -108,6 +112,17 @@ namespace osu.Game.Screens.Ranking
             FillFlowContainer buttons;
 
             popInSample = audio.Samples.Get(@"UI/overlay-pop-in");
+
+            // only finished plays by the local user have hit events to summarise (this excludes replays and autoplay).
+            if (Score != null
+                && IsLocalPlay
+                && player != null
+                && player is not ReplayPlayer
+                && !Score.User.IsBot
+                && Score.HitEvents.Count > 0)
+            {
+                sessionStats?.Record(Score);
+            }
 
             bool playApplause = Score != null
                                 && player != null
