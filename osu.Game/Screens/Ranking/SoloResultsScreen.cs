@@ -52,6 +52,10 @@ namespace osu.Game.Screens.Ranking
         {
             Debug.Assert(Score != null);
 
+            // beatmaps unknown to the server have no online scores to look up (the request would throw).
+            if (Score.BeatmapInfo!.OnlineID <= 0)
+                return null;
+
             var request = new GetScoresRequest(
                 Score.BeatmapInfo!,
                 Score.Ruleset,
@@ -70,7 +74,7 @@ namespace osu.Game.Screens.Ranking
             if (userScore?.Score != null)
             {
                 if (userScore.Score.MatchesOnlineID(Score)
-                    || userScore.Score.User.OnlineID == Score.User.OnlineID
+                    || userScore.Score.UserID == Score.UserID
                     && userScore.Score.TotalScore == Score.TotalScore
                     && userScore.Score.MaxCombo == Score.MaxCombo)
                 {
@@ -83,7 +87,7 @@ namespace osu.Game.Screens.Ranking
                 var score = request.Response.Scores[i];
 
                 if (score.MatchesOnlineID(Score)
-                    || (score.User.OnlineID == Score.User.OnlineID
+                    || (score.UserID == Score.UserID
                         && score.TotalScore == Score.TotalScore
                         && score.MaxCombo == Score.MaxCombo))
                 {
