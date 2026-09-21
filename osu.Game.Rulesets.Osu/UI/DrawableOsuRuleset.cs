@@ -287,7 +287,19 @@ namespace osu.Game.Rulesets.Osu.UI
              * Stable Skooter performs correction immediately around the hit time,
              * rather than throughout the complete early hittable window.
              */
-            if (targetCircle.HitObject.StartTime - time >= 12)
+            /*
+             * The correction is only held for a couple of input updates.
+             * Relax doesn't click until its hit time, so start the correction
+             * then, otherwise it would already have expired by the time Relax clicks.
+             */
+            bool tooEarly =
+                AnarchySettingsState.Relax
+                    ? time <
+                      targetCircle.HitObject.StartTime +
+                      relax_hit_offset
+                    : targetCircle.HitObject.StartTime - time >= 12;
+
+            if (tooEarly)
                 return;
 
             Vector2 cursorPosition =
