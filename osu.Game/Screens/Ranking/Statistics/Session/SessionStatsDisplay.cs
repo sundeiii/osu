@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
 
@@ -29,14 +30,17 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         private SessionStatsStore? store { get; set; }
 
         private readonly IReadOnlyList<SessionPlayRecord>? plays;
-        private readonly bool showPlayList;
+        private readonly bool detailed;
 
         /// <param name="plays">The plays to show, oldest first. Defaults to the plays of the current session.</param>
-        /// <param name="showPlayList">Whether to also list the individual plays.</param>
-        public SessionStatsDisplay(IReadOnlyList<SessionPlayRecord>? plays = null, bool showPlayList = false)
+        /// <param name="detailed">
+        /// Whether to also show the combined hit error distribution, the comparison between setups and a list of individual plays.
+        /// Leave off where a single play's own statistics are already shown next to it, like the results screen.
+        /// </param>
+        public SessionStatsDisplay(IReadOnlyList<SessionPlayRecord>? plays = null, bool detailed = false)
         {
             this.plays = plays;
-            this.showPlayList = showPlayList;
+            this.detailed = detailed;
         }
 
         [BackgroundDependencyLoader]
@@ -48,40 +52,86 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             var shownPlays = plays ?? store?.CurrentSessionPlays ?? [];
             var summary = SessionSummary.Create(shownPlays);
 
+            var table = new SimpleStatisticTable(2, new SimpleStatisticItem[]
+            {
+                new TextItem("Plays", summary.PlayCount.ToString()),
+                new TextItem("Average accuracy", formatAccuracy(summary.AverageAccuracy)),
+                new TextItem("Average unstable rate", formatNumber(summary.AverageUnstableRate)),
+                new TextItem("Best unstable rate", formatNumber(summary.BestUnstableRate)),
+                new TextItem("Average hit error", formatHitError(summary.AverageHitError)),
+                new TextItem("Total misses", summary.TotalMisses.ToString()),
+            });
+
+            InternalChild = detailed ? createDetailed(shownPlays, summary, table) : createCompact(shownPlays, table);
+        }
+
+        /// <summary>
+        /// A single short row, so the results screen (which already has plenty of other statistics) can still show everything on one screen.
+        /// </summary>
+        private static Drawable createCompact(IReadOnlyList<SessionPlayRecord> shownPlays, Drawable table)
+        {
+            if (shownPlays.Count == 0)
+                return table;
+
+            return new GridContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                ColumnDimensions = new[]
+                {
+                    new Dimension(GridSizeMode.Relative, 0.32f),
+                    new Dimension(GridSizeMode.Absolute, column_spacing),
+                    new Dimension(),
+                    new Dimension(GridSizeMode.Absolute, column_spacing),
+                    new Dimension(),
+                },
+                RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                Content = new[]
+                {
+                    new[]
+                    {
+                        table,
+                        new Container(),
+                        createUnstableRateChart(shownPlays, compact: true),
+                        new Container(),
+                        createAccuracyChart(shownPlays, compact: true),
+                    }
+                },
+            };
+        }
+
+        private static Drawable createDetailed(IReadOnlyList<SessionPlayRecord> shownPlays, SessionSummary summary, Drawable table)
+        {
             var flow = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Vertical,
                 Spacing = new Vector2(0, 16),
+                Child = table,
             };
-
-            flow.Add(new SimpleStatisticTable(2, new SimpleStatisticItem[]
-            {
-                new TextItem("Plays", summary.PlayCount.ToString()),
-                new TextItem("Average accuracy", summary.AverageAccuracy.ToString("P2")),
-                new TextItem("Average unstable rate", formatNumber(summary.AverageUnstableRate)),
-                new TextItem("Best unstable rate", formatNumber(summary.BestUnstableRate)),
-                new TextItem("Average hit error", formatHitError(summary.AverageHitError)),
-                new TextItem("Total misses", summary.TotalMisses.ToString()),
-            }));
 
             if (shownPlays.Count > 0)
             {
                 flow.Add(createTwoColumns(
-                    new SessionTrendChart("Unstable rate (lower is better)", shownPlays, p => p.UnstableRate, v => v.ToString("N2"), lowerIsBetter: true),
-                    new SessionTrendChart("Accuracy", shownPlays, p => p.Accuracy, v => v.ToString("P2"), lowerIsBetter: false)));
+                    createUnstableRateChart(shownPlays, compact: false),
+                    createAccuracyChart(shownPlays, compact: false)));
 
                 flow.Add(createTwoColumns(
                     new HitErrorHistogramChart(SessionSummary.CombineHistograms(shownPlays)),
                     createSetupComparison(summary)));
+
+                flow.Add(createPlayList(shownPlays));
             }
 
-            if (showPlayList && shownPlays.Count > 0)
-                flow.Add(createPlayList(shownPlays));
-
-            InternalChild = flow;
+            return flow;
         }
+
+        private static SessionTrendChart createUnstableRateChart(IReadOnlyList<SessionPlayRecord> shownPlays, bool compact)
+            => new SessionTrendChart(compact ? "Unstable rate" : "Unstable rate (lower is better)", shownPlays, p => p.UnstableRate, v => v.ToString("N2"), lowerIsBetter: true, compact);
+
+        private static SessionTrendChart createAccuracyChart(IReadOnlyList<SessionPlayRecord> shownPlays, bool compact)
+            => new SessionTrendChart("Accuracy", shownPlays, p => p.Accuracy, formatAccuracy, lowerIsBetter: false, compact);
 
         private static Drawable createTwoColumns(Drawable left, Drawable right) => new GridContainer
         {
@@ -118,7 +168,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 {
                     Text = $"{label}: {setupSummary.PlayCount} play{(setupSummary.PlayCount == 1 ? string.Empty : "s")}"
                            + $" · UR {formatNumber(setupSummary.AverageUnstableRate)}"
-                           + $" · {setupSummary.AverageAccuracy:P2}",
+                           + $" · {formatAccuracy(setupSummary.AverageAccuracy)}",
                     Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE),
                 });
             }
@@ -150,7 +200,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                     play.PlayedAt.LocalDateTime.ToString("d MMM HH:mm"),
                     play.Beatmap,
                     play.Setup.Label,
-                    play.Accuracy.ToString("P2"),
+                    formatAccuracy(play.Accuracy),
                     formatNumber(play.UnstableRate),
                     formatHitError(play.AverageHitError),
                     play.MissCount.ToString(),
@@ -165,6 +215,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             var font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE, weight: isHeader ? FontWeight.Bold : FontWeight.Regular);
             Color4 colour = isHeader ? Color4.White.Opacity(0.6f) : Color4.White;
 
+            // long texts are truncated (with the full text available as a tooltip) rather than spilling into the next column.
             Drawable cell(string text, bool truncate = false) => truncate
                 ? new TruncatingSpriteText
                 {
@@ -188,7 +239,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 {
                     new Dimension(GridSizeMode.Absolute, 110),
                     new Dimension(),
-                    new Dimension(GridSizeMode.Absolute, 230),
+                    new Dimension(GridSizeMode.Absolute, 400),
                     new Dimension(GridSizeMode.Absolute, 80),
                     new Dimension(GridSizeMode.Absolute, 70),
                     new Dimension(GridSizeMode.Absolute, 120),
@@ -201,7 +252,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                     {
                         cell(time),
                         cell(beatmap, truncate: true),
-                        cell(setup),
+                        cell(setup, truncate: true),
                         cell(accuracy),
                         cell(unstableRate),
                         cell(hitError),
@@ -210,6 +261,9 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 },
             };
         }
+
+        // the game's own formatter, so accuracy never shows a different number than the results screen does.
+        private static string formatAccuracy(double accuracy) => accuracy.FormatAccuracy().ToString();
 
         private static string formatNumber(double? value) => value?.ToString("N2") ?? "-";
 

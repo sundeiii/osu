@@ -23,13 +23,14 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
     /// </summary>
     public partial class SessionTrendChart : CompositeDrawable
     {
-        private const float plot_height = 90;
-        private const float axis_width = 52;
-        private const float padding = 10;
         private const float line_thickness = 2;
         private const float dot_size = 6;
         private const float latest_dot_size = 10;
         private const int max_points = 60;
+
+        private readonly float plotHeight;
+        private readonly float axisWidth;
+        private readonly float padding;
 
         private readonly string title;
         private readonly Func<double, string> format;
@@ -43,6 +44,8 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         private readonly LayoutValue layoutCache = new LayoutValue(Invalidation.DrawSize);
 
         private Container? plotArea;
+        private Box? guideLine;
+        private Vector2[] positions = Array.Empty<Vector2>();
         private double min;
         private double max;
 
@@ -51,11 +54,16 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         /// <param name="selector">Selects the charted value of a play.</param>
         /// <param name="format">Formats a value (or a difference between two values) for display.</param>
         /// <param name="lowerIsBetter">Whether a decrease is an improvement, which decides how the latest change is coloured.</param>
-        public SessionTrendChart(string title, IReadOnlyList<SessionPlayRecord> plays, Func<SessionPlayRecord, double?> selector, Func<double, string> format, bool lowerIsBetter)
+        /// <param name="compact">Whether to use a smaller plot, for places short on vertical space.</param>
+        public SessionTrendChart(string title, IReadOnlyList<SessionPlayRecord> plays, Func<SessionPlayRecord, double?> selector, Func<double, string> format, bool lowerIsBetter, bool compact = false)
         {
             this.title = title;
             this.format = format;
             this.lowerIsBetter = lowerIsBetter;
+
+            plotHeight = compact ? 56 : 90;
+            axisWidth = compact ? 46 : 52;
+            padding = compact ? 7 : 10;
 
             points = plays.Select(p => (Play: p, Value: selector(p)))
                           .Where(p => p.Value != null)
@@ -161,6 +169,16 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             }
 
             var lineContainer = new Container { RelativeSizeAxes = Axes.Both };
+
+            // shown at the hovered point.
+            guideLine = new Box
+            {
+                RelativeSizeAxes = Axes.Y,
+                Width = 1,
+                Origin = Anchor.TopCentre,
+                Colour = Color4.White,
+                Alpha = 0,
+            };
             var dotContainer = new Container { RelativeSizeAxes = Axes.Both };
             var columnContainer = new Container { RelativeSizeAxes = Axes.Both };
 
@@ -209,10 +227,10 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 dots.Add(dot);
                 dotContainer.Add(dot);
 
-                var column = new ChartHoverColumn($"{play.Beatmap}\n{format(value)} · {play.PlayedAt.LocalDateTime:HH:mm} · {play.Setup.Label}")
-                {
-                    Origin = Anchor.TopCentre,
-                };
+                var column = new ChartHoverColumn($"{play.Beatmap}\n{format(value)} · {play.PlayedAt.LocalDateTime:HH:mm} · {play.Setup.Label}");
+
+                int index = i;
+                column.HoverChanged += hovered => setHovered(index, hovered);
 
                 columns.Add(column);
                 columnContainer.Add(column);
@@ -221,14 +239,14 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             plotArea = new Container
             {
                 RelativeSizeAxes = Axes.Both,
-                Padding = new MarginPadding { Left = axis_width },
-                Children = new Drawable[] { lineContainer, dotContainer, columnContainer },
+                Padding = new MarginPadding { Left = axisWidth },
+                Children = new Drawable[] { guideLine, lineContainer, dotContainer, columnContainer },
             };
 
             return new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Height = plot_height,
+                Height = plotHeight,
                 Children = new Drawable[]
                 {
                     new OsuSpriteText
@@ -254,6 +272,18 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             };
         }
 
+        private void setHovered(int index, bool hovered)
+        {
+            if (guideLine == null || index >= positions.Length)
+                return;
+
+            if (hovered)
+                guideLine.X = positions[index].X;
+
+            guideLine.FadeTo(hovered ? 0.3f : 0, 100);
+            dots[index].ScaleTo(hovered ? 1.6f : 1, 100, Easing.OutQuint);
+        }
+
         protected override void Update()
         {
             base.Update();
@@ -274,7 +304,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             if (width <= 0 || height <= 0)
                 return false;
 
-            var positions = new Vector2[points.Count];
+            positions = new Vector2[points.Count];
 
             for (int i = 0; i < points.Count; i++)
             {
@@ -285,14 +315,17 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                     padding + (1 - t) * (height - 2 * padding));
             }
 
-            float columnWidth = (width - 2 * padding) / (points.Count - 1);
-
             for (int i = 0; i < points.Count; i++)
             {
                 dots[i].Position = positions[i];
 
-                columns[i].Position = new Vector2(positions[i].X, 0);
-                columns[i].Size = new Vector2(columnWidth, height);
+                // neighbouring columns meet halfway between their points, and the outer ones stop at the edge of the plot,
+                // so a column never reaches outside the chart it belongs to.
+                float left = i == 0 ? 0 : (positions[i - 1].X + positions[i].X) / 2;
+                float right = i == points.Count - 1 ? width : (positions[i].X + positions[i + 1].X) / 2;
+
+                columns[i].Position = new Vector2(left, 0);
+                columns[i].Size = new Vector2(right - left, height);
 
                 if (i < points.Count - 1)
                 {

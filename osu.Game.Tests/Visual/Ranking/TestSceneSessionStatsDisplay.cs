@@ -6,13 +6,15 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
+using osuTK;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Screens.Ranking.Statistics.Session;
 
 namespace osu.Game.Tests.Visual.Ranking
 {
-    public partial class TestSceneSessionStatsDisplay : OsuTestScene
+    public partial class TestSceneSessionStatsDisplay : OsuManualInputManagerTestScene
     {
         [SetUp]
         public void SetUp() => Schedule(() => Clear());
@@ -31,7 +33,62 @@ namespace osu.Game.Tests.Visual.Ranking
             AddStep("show display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 1)));
             AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
             AddAssert("both trend charts present", () => this.ChildrenOfType<SessionTrendChart>().Count() == 2);
+
+            // the results screen already shows the play's own timing distribution, so the compact view leaves the combined one out.
+            AddAssert("no histogram in compact view", () => !this.ChildrenOfType<HitErrorHistogramChart>().Any());
+        }
+
+        [Test]
+        public void TestCompactViewIsShort()
+        {
+            AddStep("show display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 6)));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddUntilStep("charts laid out", () => this.ChildrenOfType<SessionTrendChart>().All(c => c.ChildrenOfType<ChartHoverColumn>().All(column => column.DrawWidth > 0)));
+
+            AddStep("log height", () => osu.Framework.Logging.Logger.Log($"[HEIGHT] compact display is {this.ChildrenOfType<SessionStatsDisplay>().Single().DrawHeight}px tall"));
+
+            // the results screen has to fit this next to all its other statistics without scrolling, so it must stay one short row.
+            AddAssert("compact view is one short row", () => this.ChildrenOfType<SessionStatsDisplay>().Single().DrawHeight < 100);
+        }
+
+        [Test]
+        public void TestDetailedView()
+        {
+            AddStep("show detailed display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 8), detailed: true));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("both trend charts present", () => this.ChildrenOfType<SessionTrendChart>().Count() == 2);
             AddAssert("histogram present", () => this.ChildrenOfType<HitErrorHistogramChart>().Count() == 1);
+            AddStep("log height", () => osu.Framework.Logging.Logger.Log($"[HEIGHT] detailed display is {this.ChildrenOfType<SessionStatsDisplay>().Single().DrawHeight}px tall"));
+            AddAssert("detailed view is much taller than the compact one", () => this.ChildrenOfType<SessionStatsDisplay>().Single().DrawHeight > 300);
+        }
+
+        [Test]
+        public void TestHoveringAPointDoesNotThrowAndRecovers()
+        {
+            AddStep("show display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 5)));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+
+            AddUntilStep("charts laid out", () => this.ChildrenOfType<SessionTrendChart>().All(c => c.ChildrenOfType<ChartHoverColumn>().All(column => column.DrawWidth > 0)));
+
+            AddStep("hover a point", () => InputManager.MoveMouseTo(this.ChildrenOfType<SessionTrendChart>().First().ChildrenOfType<ChartHoverColumn>().ElementAt(2)));
+            AddUntilStep("column is hovered", () => this.ChildrenOfType<SessionTrendChart>().First().ChildrenOfType<ChartHoverColumn>().ElementAt(2).IsHovered);
+            AddStep("move away", () => InputManager.MoveMouseTo(Vector2.Zero));
+            AddUntilStep("column no longer hovered", () => !this.ChildrenOfType<SessionTrendChart>().First().ChildrenOfType<ChartHoverColumn>().ElementAt(2).IsHovered);
+        }
+
+        [Test]
+        public void TestColumnsStayInsideTheirChart()
+        {
+            AddStep("show display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 2)));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+
+            AddUntilStep("charts laid out", () => this.ChildrenOfType<SessionTrendChart>().All(c => c.ChildrenOfType<ChartHoverColumn>().All(column => column.DrawWidth > 0)));
+
+            // with only two points, the columns used to be as wide as the whole chart and reached into the neighbouring one.
+            AddAssert("no column extends beyond its chart", () => this.ChildrenOfType<SessionTrendChart>().All(chart =>
+                chart.ChildrenOfType<ChartHoverColumn>().All(column =>
+                    column.ScreenSpaceDrawQuad.TopLeft.X >= chart.ScreenSpaceDrawQuad.TopLeft.X - 1
+                    && column.ScreenSpaceDrawQuad.TopRight.X <= chart.ScreenSpaceDrawQuad.TopRight.X + 1)));
         }
 
         [Test]
@@ -60,20 +117,21 @@ namespace osu.Game.Tests.Visual.Ranking
         private SessionStatsStore createStore(int pastSessions, int currentPlays)
             => SessionStatsTestHelper.CreateStore(LocalStorage.GetStorageForDirectory(Guid.NewGuid().ToString("N")), pastSessions, currentPlays);
 
-        private void showDisplay(SessionStatsStore store) => Child = new DependencyProvidingContainer
+        private void showDisplay(SessionStatsStore store, bool detailed = false) => Child = new DependencyProvidingContainer
         {
             RelativeSizeAxes = Axes.Both,
             CachedDependencies = new (Type, object)[] { (typeof(SessionStatsStore), store) },
             Child = new OsuTooltipContainer(null)
             {
                 RelativeSizeAxes = Axes.Both,
-                Child = new SessionStatsDisplay
+                // the display fills the width it is given, so give it a fixed one here (roughly the results screen statistics area).
+                Child = new Container
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    // matches the width of the results screen statistics area.
-                    RelativeSizeAxes = Axes.None,
                     Width = 1000,
+                    AutoSizeAxes = Axes.Y,
+                    Child = new SessionStatsDisplay(detailed: detailed),
                 }
             }
         };

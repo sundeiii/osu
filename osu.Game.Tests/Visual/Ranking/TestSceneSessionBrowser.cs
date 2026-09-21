@@ -5,6 +5,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Testing;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Screens.Ranking.Statistics.Session;
 
 namespace osu.Game.Tests.Visual.Ranking
@@ -26,6 +27,7 @@ namespace osu.Game.Tests.Visual.Ranking
             AddStep("open browser", () => LoadScreen(new SessionBrowserScreen()));
 
             // "all time" plus one entry per session.
+            AddUntilStep("screen is titled", () => this.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "Session stats"));
             AddUntilStep("all sessions listed", () => this.ChildrenOfType<SessionBrowserScreen.SessionListItem>().Count() == store.GetSessions().Count + 1);
             AddUntilStep("current session shown by default", () => this.ChildrenOfType<SessionStatsDisplay>().Any(d => d.IsLoaded));
 
@@ -34,7 +36,8 @@ namespace osu.Game.Tests.Visual.Ranking
 
             AddStep("select oldest session", () => this.ChildrenOfType<SessionBrowserScreen.SessionListItem>().Last().TriggerClick());
             AddUntilStep("session details shown", () => this.ChildrenOfType<SessionStatsDisplay>().Any(d => d.IsLoaded));
-            AddAssert("individual plays are listed", () => this.ChildrenOfType<SessionTrendChart>().Any());
+            AddAssert("trend charts shown", () => this.ChildrenOfType<SessionTrendChart>().Any());
+            AddAssert("combined histogram shown", () => this.ChildrenOfType<HitErrorHistogramChart>().Any());
         }
     }
 

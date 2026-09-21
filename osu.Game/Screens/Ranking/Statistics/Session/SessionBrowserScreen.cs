@@ -13,6 +13,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
+using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
 
@@ -23,8 +24,6 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
     /// </summary>
     public partial class SessionBrowserScreen : OsuScreen
     {
-        public override bool HideOverlaysOnEnter => true;
-
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Aquamarine);
 
@@ -50,19 +49,35 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 {
                     RelativeSizeAxes = Axes.Both,
                     // leave room for the toolbar at the top and the back button at the bottom.
-                    Padding = new MarginPadding { Top = Overlays.Toolbar.Toolbar.HEIGHT + 20, Bottom = 80, Left = 20, Right = 20 },
+                    Padding = new MarginPadding { Top = Overlays.Toolbar.Toolbar.HEIGHT + 10, Bottom = 80, Left = 20, Right = 20 },
                     Child = new GridContainer
                     {
                         RelativeSizeAxes = Axes.Both,
-                        ColumnDimensions = new[]
+                        RowDimensions = new[]
                         {
-                            new Dimension(GridSizeMode.Absolute, 340),
-                            new Dimension(GridSizeMode.Absolute, 20),
+                            new Dimension(GridSizeMode.AutoSize),
                             new Dimension(),
                         },
                         Content = new[]
                         {
-                            new[] { createListPanel(), new Container(), createDetailPanel() }
+                            new[] { createHeader() },
+                            new[]
+                            {
+                                new GridContainer
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    ColumnDimensions = new[]
+                                    {
+                                        new Dimension(GridSizeMode.Absolute, 340),
+                                        new Dimension(GridSizeMode.Absolute, 20),
+                                        new Dimension(),
+                                    },
+                                    Content = new[]
+                                    {
+                                        new[] { createListPanel(), new Container(), createDetailPanel() }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -70,6 +85,29 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
 
             populateList();
         }
+
+        private static Drawable createHeader() => new FillFlowContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Vertical,
+            Padding = new MarginPadding { Bottom = 16 },
+            Spacing = new Vector2(0, 2),
+            Children = new Drawable[]
+            {
+                new OsuSpriteText
+                {
+                    Text = "Session stats",
+                    Font = OsuFont.GetFont(size: 30, weight: FontWeight.Bold),
+                },
+                new OsuSpriteText
+                {
+                    Text = "How your plays are going, grouped by session",
+                    Font = OsuFont.GetFont(size: 14),
+                    Colour = Color4.White.Opacity(0.6f),
+                },
+            }
+        };
 
         private Drawable createListPanel() => new Container
         {
@@ -191,7 +229,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             loadCancellation?.Cancel();
             loadCancellation = new CancellationTokenSource();
 
-            LoadComponentAsync(new SessionStatsDisplay(item.Entry.Plays, showPlayList: true), display => detailHolder.Child = display, loadCancellation.Token);
+            LoadComponentAsync(new SessionStatsDisplay(item.Entry.Plays, detailed: true), display => detailHolder.Child = display, loadCancellation.Token);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -209,7 +247,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                     var summary = SessionSummary.Create(Plays);
                     string unstableRate = summary.AverageUnstableRate?.ToString("N1") ?? "-";
 
-                    return $"{Plays.Count} play{(Plays.Count == 1 ? string.Empty : "s")} · {summary.AverageAccuracy:P1} · UR {unstableRate}";
+                    return $"{Plays.Count} play{(Plays.Count == 1 ? string.Empty : "s")} · {summary.AverageAccuracy.FormatAccuracy()} · UR {unstableRate}";
                 }
             }
         }

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions.Color4Extensions;
@@ -22,7 +23,10 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
     {
         private const float plot_height = 90;
 
+        private const float idle_alpha = 0.75f;
+
         private readonly int[] bins;
+        private readonly List<Box> bars = new List<Box>();
 
         /// <param name="bins">Hit counts per bin, laid out as described by <see cref="SessionPlayRecord.HitErrorHistogram"/>.</param>
         public HitErrorHistogramChart(int[] bins)
@@ -101,8 +105,9 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             {
                 bool isCentre = i == half;
 
-                plot.Add(new Box
+                var bar = new Box
                 {
+                    Alpha = idle_alpha,
                     RelativePositionAxes = Axes.X,
                     RelativeSizeAxes = Axes.Both,
                     X = (i + 0.1f) / binCount,
@@ -112,18 +117,26 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
                     Colour = isCentre ? Color4.White : colours.Blue,
-                });
+                };
+
+                bars.Add(bar);
+                plot.Add(bar);
             }
 
             for (int i = 0; i < binCount; i++)
             {
-                plot.Add(new ChartHoverColumn($"{describeBin(i)}: {bins[i]:N0} hits ({bins[i] / (double)total:P1})")
+                var column = new ChartHoverColumn($"{describeBin(i)}: {bins[i]:N0} hits ({bins[i] / (double)total:P1})")
                 {
                     RelativePositionAxes = Axes.X,
                     RelativeSizeAxes = Axes.Both,
                     X = i / (float)binCount,
                     Width = 1f / binCount,
-                });
+                };
+
+                int index = i;
+                column.HoverChanged += hovered => bars[index].FadeTo(hovered ? 1f : idle_alpha, 100);
+
+                plot.Add(column);
             }
 
             var axis = new Container
