@@ -134,6 +134,59 @@ namespace osu.Game.Tests.NonVisual.Ranking
         }
 
         [Test]
+        public void TestSessionsAreGroupedNewestFirst()
+        {
+            using var storage = new TemporaryNativeStorage("session-stats-test");
+
+            var older = new SessionStatsStore(storage);
+            older.Record(createScore(1, 2, 3), new AnarchySetupSnapshot(), DateTimeOffset.Now.AddDays(-2));
+            older.Record(createScore(1, 2, 3), new AnarchySetupSnapshot(), DateTimeOffset.Now.AddDays(-2).AddMinutes(5));
+
+            var newer = new SessionStatsStore(storage);
+            newer.Record(createScore(1, 2, 3), new AnarchySetupSnapshot(), DateTimeOffset.Now.AddDays(-1));
+
+            var sessions = newer.GetSessions();
+
+            Assert.That(sessions, Has.Count.EqualTo(2));
+            Assert.That(sessions[0].SessionId, Is.EqualTo(newer.SessionId));
+            Assert.That(sessions[0].Plays, Has.Count.EqualTo(1));
+            Assert.That(sessions[1].SessionId, Is.EqualTo(older.SessionId));
+            Assert.That(sessions[1].Plays, Has.Count.EqualTo(2));
+            Assert.That(sessions[1].Plays[0].PlayedAt, Is.LessThan(sessions[1].Plays[1].PlayedAt));
+        }
+
+        [Test]
+        public void TestHistogramsAreCombined()
+        {
+            using var storage = new TemporaryNativeStorage("session-stats-test");
+            var store = new SessionStatsStore(storage);
+
+            store.Record(createScore(0, 0, 5), new AnarchySetupSnapshot(), DateTimeOffset.Now);
+            store.Record(createScore(0, -5), new AnarchySetupSnapshot(), DateTimeOffset.Now);
+
+            int[] combined = SessionSummary.CombineHistograms(store.CurrentSessionPlays);
+            int centre = SessionPlayRecord.HISTOGRAM_HALF_BINS;
+
+            Assert.That(combined, Has.Length.EqualTo(centre * 2 + 1));
+            Assert.That(combined[centre], Is.EqualTo(3));
+            Assert.That(combined[centre + 1], Is.EqualTo(1));
+            Assert.That(combined[centre - 1], Is.EqualTo(1));
+            Assert.That(combined.Sum(), Is.EqualTo(5));
+        }
+
+        [Test]
+        public void TestHistogramsWithUnexpectedLayoutAreIgnored()
+        {
+            var plays = new[]
+            {
+                new SessionPlayRecord { HitErrorHistogram = new[] { 1, 2, 3 } },
+                new SessionPlayRecord { HitErrorHistogram = new int[SessionPlayRecord.HISTOGRAM_HALF_BINS * 2 + 1] },
+            };
+
+            Assert.That(SessionSummary.CombineHistograms(plays).Sum(), Is.EqualTo(0));
+        }
+
+        [Test]
         public void TestSetupLabels()
         {
             Assert.That(new AnarchySetupSnapshot().Label, Is.EqualTo("Manual"));

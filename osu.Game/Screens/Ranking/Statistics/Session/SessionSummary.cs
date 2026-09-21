@@ -37,6 +37,26 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
 
         public static SessionSummary Create(IReadOnlyList<SessionPlayRecord> plays) => create(plays, true);
 
+        /// <summary>
+        /// Adds up the hit error histograms of all <paramref name="plays"/>.
+        /// </summary>
+        public static int[] CombineHistograms(IEnumerable<SessionPlayRecord> plays)
+        {
+            int[] combined = new int[SessionPlayRecord.HISTOGRAM_HALF_BINS * 2 + 1];
+
+            foreach (var play in plays)
+            {
+                // ignore anything that was stored with a different bin layout.
+                if (play.HitErrorHistogram.Length != combined.Length)
+                    continue;
+
+                for (int i = 0; i < combined.Length; i++)
+                    combined[i] += play.HitErrorHistogram[i];
+            }
+
+            return combined;
+        }
+
         private static SessionSummary create(IReadOnlyList<SessionPlayRecord> plays, bool splitBySetup)
         {
             double[] unstableRates = plays.Where(p => p.UnstableRate != null).Select(p => p.UnstableRate!.Value).ToArray();

@@ -54,6 +54,20 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             }
         }
 
+        /// <summary>
+        /// All stored sessions, newest first.
+        /// </summary>
+        public IReadOnlyList<SessionGroup> GetSessions()
+        {
+            lock (syncLock)
+            {
+                return records.GroupBy(r => r.SessionId)
+                              .Select(g => new SessionGroup(g.Key, g))
+                              .OrderByDescending(s => s.Start)
+                              .ToList();
+            }
+        }
+
         private readonly Storage storage;
         private readonly List<SessionPlayRecord> records;
         private readonly object syncLock = new object();

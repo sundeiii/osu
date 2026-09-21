@@ -7,9 +7,12 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using osu.Framework.Screens;
 using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
+using osu.Game.Screens;
+using osu.Game.Screens.Ranking.Statistics.Session;
 
 namespace osu.Game.Overlays.Settings.Sections.Gameplay
 {
@@ -48,10 +51,13 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 "aim assistance",
                 "aim correction",
                 "skooter",
+                "session",
+                "stats",
+                "history",
             });
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(OsuConfigManager config, IPerformFromScreenRunner? performer)
         {
             Bindable<bool> relax =
                 config.GetBindable<bool>(OsuSetting.AnarchyRelax);
@@ -186,6 +192,12 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     HintText = AnarchySettingsStrings.RelativeCorrectionDescription,
                     Current = aimCorrectionRelative,
                 }),
+
+                new SettingsButtonV2
+                {
+                    Text = "Open session stats",
+                    Action = () => performer?.PerformFromScreen(menu => menu.Push(new SessionBrowserScreen())),
+                },
             };
         }
     }

@@ -6,78 +6,76 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
 using osu.Game.Graphics.Cursor;
-using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Osu;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics.Session;
 
 namespace osu.Game.Tests.Visual.Ranking
 {
     public partial class TestSceneSessionStatsDisplay : OsuTestScene
     {
-        private SessionStatsStore store = null!;
-
-        [BackgroundDependencyLoader]
-        private void load()
-        {
-            Dependencies.Cache(store = new SessionStatsStore(LocalStorage));
-        }
-
         [SetUp]
         public void SetUp() => Schedule(() => Clear());
 
         [Test]
         public void TestEmptySession()
         {
-            AddStep("show display", showDisplay);
-            AddAssert("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().Single().IsLoaded);
+            AddStep("show display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 0)));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("no charts for empty session", () => !this.ChildrenOfType<SessionTrendChart>().Any());
+        }
+
+        [Test]
+        public void TestSinglePlay()
+        {
+            AddStep("show display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 1)));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("both trend charts present", () => this.ChildrenOfType<SessionTrendChart>().Count() == 2);
+            AddAssert("histogram present", () => this.ChildrenOfType<HitErrorHistogramChart>().Count() == 1);
         }
 
         [Test]
         public void TestPopulatedSession()
         {
-            AddStep("record a session of plays", () =>
-            {
-                var random = new Random(1234);
-
-                for (int i = 0; i < 12; i++)
-                {
-                    // drift towards more consistent hits as the session goes on, and switch setups half way.
-                    double spread = 40 - i * 2.5;
-                    var setup = new AnarchySetupSnapshot { Relax = i >= 6, AimAssist = i >= 6 };
-
-                    store.Record(createScore(random, spread), setup, DateTimeOffset.Now.AddMinutes(i));
-                }
-            });
-
-            AddStep("show display", showDisplay);
-            AddAssert("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().Single().IsLoaded);
+            AddStep("show display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 12)));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("both trend charts present", () => this.ChildrenOfType<SessionTrendChart>().Count() == 2);
+            AddAssert("every play is hoverable on both charts", () => trendColumnCount() == 2 * 12);
         }
 
-        private void showDisplay() => Child = new OsuTooltipContainer(null)
+        [Test]
+        public void TestOnlySessionPlaysAreShown()
+        {
+            SessionStatsStore store = null!;
+
+            AddStep("show display with history", () => showDisplay(store = createStore(pastSessions: 2, currentPlays: 4)));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("history exists", () => store.AllPlays.Count > store.CurrentSessionPlays.Count);
+            AddAssert("only current session charted", () => trendColumnCount() == 2 * 4);
+        }
+
+        // the histogram has hover columns of its own, so only count the ones belonging to the trend charts.
+        private int trendColumnCount() => this.ChildrenOfType<SessionTrendChart>().Sum(c => c.ChildrenOfType<ChartHoverColumn>().Count());
+
+        private SessionStatsStore createStore(int pastSessions, int currentPlays)
+            => SessionStatsTestHelper.CreateStore(LocalStorage.GetStorageForDirectory(Guid.NewGuid().ToString("N")), pastSessions, currentPlays);
+
+        private void showDisplay(SessionStatsStore store) => Child = new DependencyProvidingContainer
         {
             RelativeSizeAxes = Axes.Both,
-            Child = new SessionStatsDisplay
+            CachedDependencies = new (Type, object)[] { (typeof(SessionStatsStore), store) },
+            Child = new OsuTooltipContainer(null)
             {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Width = 500,
-                RelativeSizeAxes = Axes.None,
+                RelativeSizeAxes = Axes.Both,
+                Child = new SessionStatsDisplay
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    // matches the width of the results screen statistics area.
+                    RelativeSizeAxes = Axes.None,
+                    Width = 1000,
+                }
             }
-        };
-
-        private static ScoreInfo createScore(Random random, double spread) => new ScoreInfo
-        {
-            ID = Guid.NewGuid(),
-            Ruleset = new OsuRuleset().RulesetInfo,
-            Accuracy = 0.9 + random.NextDouble() * 0.09,
-            HitEvents = Enumerable.Range(0, 200)
-                                  .Select(_ => new HitEvent((random.NextDouble() - 0.5) * spread, 1.0, HitResult.Great, new HitObject(), null, null))
-                                  .ToList(),
         };
     }
 }
