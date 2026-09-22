@@ -36,6 +36,7 @@ using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Ranking;
+using osu.Game.Screens.Ranking.Statistics.Session;
 using osu.Game.Skinning;
 using osu.Game.Users;
 using osu.Game.Utils;
@@ -55,6 +56,9 @@ namespace osu.Game.Screens.Play
         /// Raised after <see cref="StartGameplay"/> is called.
         /// </summary>
         public event Action OnGameplayStarted;
+
+        [Resolved]
+        private SessionStatsStore? sessionStats { get; set; }
 
         public override bool AllowUserExit => false; // handled by HoldForMenuButton
 
@@ -379,6 +383,14 @@ namespace osu.Game.Screens.Play
 
             // Used by ReplaySettingsOverlay for button positioning.
             dependencies.CacheAs(HUDOverlay);
+
+            // count this as an attempt at the map once gameplay really starts (so a map backed out of while loading does not count),
+            // for real plays only (not replays or autoplay). the skin may show the count with an attempt counter component.
+            if (this is not ReplayPlayer && !GameplayState.Mods.OfType<ModAutoplay>().Any())
+            {
+                string attemptedBeatmap = GameplayState.Beatmap.BeatmapInfo.ToString();
+                OnGameplayStarted += () => sessionStats?.RegisterAttempt(attemptedBeatmap);
+            }
 
             if (!DrawableRuleset.AllowGameplayOverlays)
             {
