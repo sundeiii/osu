@@ -16,12 +16,14 @@ namespace osu.Game.Beatmaps
         private readonly IBeatmapUpdater beatmapUpdater;
         private readonly RealmAccess realm;
         private readonly MetadataClient metadataClient;
+        private readonly RinariBeatmapStatusSynchroniser? rinariStatusSynchroniser;
 
-        public BeatmapOnlineChangeIngest(IBeatmapUpdater beatmapUpdater, RealmAccess realm, MetadataClient metadataClient)
+        public BeatmapOnlineChangeIngest(IBeatmapUpdater beatmapUpdater, RealmAccess realm, MetadataClient metadataClient, RinariBeatmapStatusSynchroniser? rinariStatusSynchroniser = null)
         {
             this.beatmapUpdater = beatmapUpdater;
             this.realm = realm;
             this.metadataClient = metadataClient;
+            this.rinariStatusSynchroniser = rinariStatusSynchroniser;
 
             metadataClient.ChangedBeatmapSetsArrived += changesDetected;
         }
@@ -39,6 +41,11 @@ namespace osu.Game.Beatmaps
                         beatmapUpdater.Queue(matchingSet.ToLive(realm), MetadataLookupScope.OnlineFirst);
                 }
             });
+
+            // the server telling us a set changed is also a good time to re-check its Rinari status,
+            // since that isn't something the ordinary metadata lookup above understands.
+            // scoped to just the reported sets, so this never re-checks the rest of the library either.
+            rinariStatusSynchroniser?.QueueAutoSync(beatmapSetIds);
         }
 
         protected override void Dispose(bool isDisposing)

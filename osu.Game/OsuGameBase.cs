@@ -233,6 +233,7 @@ namespace osu.Game
 
         private BeatmapDifficultyCache difficultyCache;
         private IBeatmapUpdater beatmapUpdater;
+        private RinariBeatmapStatusSynchroniser rinariStatusSynchroniser;
         private OnlineAssetCachingStore onlineAssetStore;
 
         private UserLookupCache userCache;
@@ -371,9 +372,20 @@ namespace osu.Game
             dependencies.CacheAs(MultiplayerClient = new OnlineMultiplayerClient(endpoints));
             dependencies.CacheAs(metadataClient = new OnlineMetadataClient(endpoints));
 
-            base.Content.Add(new BeatmapOnlineChangeIngest(beatmapUpdater, realm, metadataClient));
+            dependencies.Cache(rinariStatusSynchroniser = new RinariBeatmapStatusSynchroniser());
+            base.Content.Add(rinariStatusSynchroniser);
 
-            BeatmapManager.ProcessBeatmap = (beatmapSet, scope) => beatmapUpdater.Process(beatmapSet, scope);
+            base.Content.Add(new BeatmapOnlineChangeIngest(beatmapUpdater, realm, metadataClient, rinariStatusSynchroniser));
+
+            BeatmapManager.ProcessBeatmap = (beatmapSet, scope) =>
+            {
+                beatmapUpdater.Process(beatmapSet, scope);
+
+                // None means "don't do online lookups" (e.g. saving in the editor); respect that here too.
+                // scoped to just this beatmapset, so importing/downloading one map never re-checks the rest of the library.
+                if (scope != MetadataLookupScope.None)
+                    rinariStatusSynchroniser.QueueAutoSync(new[] { beatmapSet.OnlineID });
+            };
 
             dependencies.Cache(userCache = new UserLookupCache());
             base.Content.Add(userCache);
