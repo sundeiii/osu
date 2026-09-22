@@ -125,6 +125,12 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         [JsonProperty("relax")]
         public bool Relax { get; set; }
 
+        [JsonProperty("relax_offset")]
+        public double RelaxOffset { get; set; }
+
+        [JsonProperty("relax_jitter")]
+        public double RelaxJitter { get; set; }
+
         [JsonProperty("aim_assist")]
         public bool AimAssist { get; set; }
 
@@ -150,32 +156,48 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         public bool RemoveHidden { get; set; }
 
         /// <summary>
-        /// A short human readable description of the enabled features, used for grouping plays.
+        /// A short human readable description of the enabled features, including their exact values.
         /// </summary>
         [JsonIgnore]
-        public string Label
+        public string Label => buildLabel(exact: true);
+
+        /// <summary>
+        /// Like <see cref="Label"/>, but only says which features were on, ignoring how they were set up.
+        /// Two plays with the same group label used the same kind of setup, even if e.g. Timewarp ran at different speeds.
+        /// </summary>
+        [JsonIgnore]
+        public string GroupLabel => buildLabel(exact: false);
+
+        private string buildLabel(bool exact)
         {
-            get
+            var parts = new List<string>();
+
+            if (Relax)
             {
-                var parts = new List<string>();
+                var details = new List<string>();
 
-                if (Relax)
-                    parts.Add("Relax");
+                if (exact && RelaxOffset != 0)
+                    details.Add($"{RelaxOffset.ToString("+0.#;-0.#", CultureInfo.InvariantCulture)} ms");
 
-                if (AimAssist)
-                    parts.Add("Aim assist");
+                if (exact && RelaxJitter > 0)
+                    details.Add($"±{RelaxJitter.ToString("0.#", CultureInfo.InvariantCulture)} ms");
 
-                if (Timewarp)
-                    parts.Add($"Timewarp {TimewarpRate.ToString("0.##", CultureInfo.InvariantCulture)}x");
-
-                if (ApproachRateOverride)
-                    parts.Add($"AR {ApproachRate.ToString("0.#", CultureInfo.InvariantCulture)}");
-
-                if (RemoveHidden)
-                    parts.Add("No Hidden");
-
-                return parts.Count == 0 ? "Manual" : string.Join(" + ", parts);
+                parts.Add(details.Count == 0 ? "Relax" : $"Relax ({string.Join(", ", details)})");
             }
+
+            if (AimAssist)
+                parts.Add("Aim assist");
+
+            if (Timewarp)
+                parts.Add(exact ? $"Timewarp {TimewarpRate.ToString("0.##", CultureInfo.InvariantCulture)}x" : "Timewarp");
+
+            if (ApproachRateOverride)
+                parts.Add(exact ? $"AR {ApproachRate.ToString("0.#", CultureInfo.InvariantCulture)}" : "AR override");
+
+            if (RemoveHidden)
+                parts.Add("No Hidden");
+
+            return parts.Count == 0 ? "Manual" : string.Join(" + ", parts);
         }
 
         /// <summary>
@@ -184,6 +206,8 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         public static AnarchySetupSnapshot Capture() => new AnarchySetupSnapshot
         {
             Relax = AnarchySettingsState.Relax,
+            RelaxOffset = AnarchySettingsState.RelaxOffset,
+            RelaxJitter = AnarchySettingsState.RelaxJitter,
             AimAssist = AnarchySettingsState.AimAssist,
             AimCorrectionStrength = AnarchySettingsState.AimCorrectionStrength.Value,
             AimCorrectionRelative = AnarchySettingsState.AimCorrectionRelative,

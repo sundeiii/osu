@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Layout;
 using osu.Game.Graphics;
@@ -41,6 +42,8 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         private readonly List<Circle> dots = new List<Circle>();
         private readonly List<ChartHoverColumn> columns = new List<ChartHoverColumn>();
         private readonly List<Box> gridLines = new List<Box>();
+        private SpriteIcon? bestStar;
+        private int bestIndex;
         private readonly LayoutValue layoutCache = new LayoutValue(Invalidation.DrawSize);
 
         private Container? plotArea;
@@ -168,6 +171,15 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 max += 1;
             }
 
+            // the best play so far (the first one, if several are equally good) gets a star.
+            bestIndex = 0;
+
+            for (int i = 1; i < points.Count; i++)
+            {
+                if (lowerIsBetter ? points[i].Value < points[bestIndex].Value : points[i].Value > points[bestIndex].Value)
+                    bestIndex = i;
+            }
+
             var lineContainer = new Container { RelativeSizeAxes = Axes.Both };
 
             // shown at the hovered point.
@@ -227,7 +239,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 dots.Add(dot);
                 dotContainer.Add(dot);
 
-                var column = new ChartHoverColumn($"{play.Beatmap}\n{format(value)} · {play.PlayedAt.LocalDateTime:HH:mm} · {play.Setup.Label}");
+                var column = new ChartHoverColumn($"{play.Beatmap}\n{(i == bestIndex ? "★ Best · " : string.Empty)}{format(value)} · {play.PlayedAt.LocalDateTime:HH:mm} · {play.Setup.Label}");
 
                 int index = i;
                 column.HoverChanged += hovered => setHovered(index, hovered);
@@ -235,6 +247,14 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 columns.Add(column);
                 columnContainer.Add(column);
             }
+
+            dotContainer.Add(bestStar = new SpriteIcon
+            {
+                Icon = FontAwesome.Solid.Star,
+                Size = new Vector2(11),
+                Origin = Anchor.Centre,
+                Colour = colours.Yellow,
+            });
 
             plotArea = new Container
             {
@@ -318,6 +338,9 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             for (int i = 0; i < points.Count; i++)
             {
                 dots[i].Position = positions[i];
+
+                if (i == bestIndex && bestStar != null)
+                    bestStar.Position = positions[i] - new Vector2(0, 11);
 
                 // neighbouring columns meet halfway between their points, and the outer ones stop at the edge of the plot,
                 // so a column never reaches outside the chart it belongs to.

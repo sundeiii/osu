@@ -30,12 +30,17 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         public double? AverageHitError { get; private init; }
 
         /// <summary>
-        /// The same numbers, split by <see cref="AnarchySetupSnapshot.Label"/>, in order of first appearance.
+        /// The same numbers, split by setup, in order of first appearance.
         /// Only populated for the top level summary.
         /// </summary>
         public IReadOnlyList<KeyValuePair<string, SessionSummary>> BySetup { get; private init; } = [];
 
-        public static SessionSummary Create(IReadOnlyList<SessionPlayRecord> plays) => create(plays, true);
+        /// <param name="plays">The plays to summarise.</param>
+        /// <param name="exactSetups">
+        /// Whether <see cref="BySetup"/> tells apart plays by their exact settings (e.g. Timewarp speed),
+        /// or only by which features were on.
+        /// </param>
+        public static SessionSummary Create(IReadOnlyList<SessionPlayRecord> plays, bool exactSetups = false) => create(plays, true, exactSetups);
 
         /// <summary>
         /// Adds up the hit error histograms of all <paramref name="plays"/>.
@@ -57,7 +62,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             return combined;
         }
 
-        private static SessionSummary create(IReadOnlyList<SessionPlayRecord> plays, bool splitBySetup)
+        private static SessionSummary create(IReadOnlyList<SessionPlayRecord> plays, bool splitBySetup, bool exactSetups)
         {
             double[] unstableRates = plays.Where(p => p.UnstableRate != null).Select(p => p.UnstableRate!.Value).ToArray();
             double[] hitErrors = plays.Where(p => p.AverageHitError != null).Select(p => p.AverageHitError!.Value).ToArray();
@@ -71,8 +76,8 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 BestUnstableRate = unstableRates.Length == 0 ? null : unstableRates.Min(),
                 AverageHitError = hitErrors.Length == 0 ? null : hitErrors.Average(),
                 BySetup = splitBySetup
-                    ? plays.GroupBy(p => p.Setup.Label)
-                           .Select(g => new KeyValuePair<string, SessionSummary>(g.Key, create(g.ToList(), false)))
+                    ? plays.GroupBy(p => exactSetups ? p.Setup.Label : p.Setup.GroupLabel)
+                           .Select(g => new KeyValuePair<string, SessionSummary>(g.Key, create(g.ToList(), false, exactSetups)))
                            .ToList()
                     : [],
             };

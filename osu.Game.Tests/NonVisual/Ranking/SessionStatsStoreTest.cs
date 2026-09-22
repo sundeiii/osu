@@ -6,6 +6,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Scoring;
@@ -26,6 +27,14 @@ namespace osu.Game.Tests.NonVisual.Ranking
             MaxCombo = 100,
             HitEvents = timeOffsets.Select(t => new HitEvent(t, 1.0, HitResult.Great, new HitObject(), null, null)).ToList(),
         };
+
+        private static ScoreInfo createMapScore(string map, double accuracy, params double[] timeOffsets)
+        {
+            var score = createScore(timeOffsets);
+            score.BeatmapInfo = new BeatmapInfo { DifficultyName = map };
+            score.Accuracy = accuracy;
+            return score;
+        }
 
         [Test]
         public void TestRecordCapturesHitErrors()
@@ -184,6 +193,140 @@ namespace osu.Game.Tests.NonVisual.Ranking
             };
 
             Assert.That(SessionSummary.CombineHistograms(plays).Sum(), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void TestSetupsAreGroupedByFeaturesUnlessExactSettingsAreAskedFor()
+        {
+            using var storage = new TemporaryNativeStorage("session-stats-test");
+            var store = new SessionStatsStore(storage);
+
+            store.Record(createScore(1, 2), new AnarchySetupSnapshot { Relax = true, Timewarp = true, TimewarpRate = 1.1 }, DateTimeOffset.Now);
+            store.Record(createScore(1, 2), new AnarchySetupSnapshot { Relax = true, Timewarp = true, TimewarpRate = 1.25 }, DateTimeOffset.Now);
+            store.Record(createScore(1, 2), new AnarchySetupSnapshot { Relax = true, Timewarp = true, TimewarpRate = 1.25, ApproachRateOverride = true, ApproachRate = 9.6 }, DateTimeOffset.Now);
+            store.Record(createScore(1, 2), new AnarchySetupSnapshot(), DateTimeOffset.Now);
+
+            var grouped = SessionSummary.Create(store.CurrentSessionPlays);
+            var exact = SessionSummary.Create(store.CurrentSessionPlays, exactSetups: true);
+
+            // by feature, the two differing only in Timewarp speed are the same kind of setup, while an AR override is not.
+            Assert.That(grouped.BySetup.Select(s => s.Key), Is.EqualTo(new[] { "Relax + Timewarp", "Relax + Timewarp + AR override", "Manual" }));
+            Assert.That(grouped.BySetup[0].Value.PlayCount, Is.EqualTo(2));
+
+            Assert.That(exact.BySetup.Select(s => s.Key), Is.EqualTo(new[] { "Relax + Timewarp 1.1x", "Relax + Timewarp 1.25x", "Relax + Timewarp 1.25x + AR 9.6", "Manual" }));
+        }
+
+        [Test]
+        public void TestRelaxTimingIsPartOfTheExactLabelOnly()
+        {
+            var setup = new AnarchySetupSnapshot { Relax = true, RelaxOffset = -2.5, RelaxJitter = 3 };
+
+            Assert.That(setup.Label, Is.EqualTo("Relax (-2.5 ms, ±3 ms)"));
+            Assert.That(setup.GroupLabel, Is.EqualTo("Relax"));
+
+            Assert.That(new AnarchySetupSnapshot { Relax = true, RelaxOffset = 4 }.Label, Is.EqualTo("Relax (+4 ms)"));
+            Assert.That(new AnarchySetupSnapshot { Relax = true, RelaxJitter = 1.5 }.Label, Is.EqualTo("Relax (±1.5 ms)"));
+            Assert.That(new AnarchySetupSnapshot { Relax = true }.Label, Is.EqualTo("Relax"));
+
+            // the timing is only worth mentioning when Relax is actually on.
+            Assert.That(new AnarchySetupSnapshot { RelaxOffset = 4 }.Label, Is.EqualTo("Manual"));
+        }
+
+        [Test]
+        public void TestRelaxTimingSurvivesBeingSaved()
+        {
+            using var storage = new TemporaryNativeStorage("session-stats-test");
+
+            new SessionStatsStore(storage).Record(createScore(1, 2), new AnarchySetupSnapshot { Relax = true, RelaxOffset = -3, RelaxJitter = 2 }, DateTimeOffset.Now);
+
+            var loaded = new SessionStatsStore(storage).AllPlays.Single();
+
+            Assert.That(loaded.Setup.RelaxOffset, Is.EqualTo(-3));
+            Assert.That(loaded.Setup.RelaxJitter, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void TestPersonalBestsAreComparedWithEarlierPlaysOfTheSameMapAndSetup()
+        {
+            using var storage = new TemporaryNativeStorage("session-stats-test");
+            var store = new SessionStatsStore(storage);
+
+            var relax = new AnarchySetupSnapshot { Relax = true };
+
+            var first = store.Record(createMapScore("A", 0.90, -30, 30, -30, 30), relax, DateTimeOffset.Now)!;
+
+            // nothing to compare the first play with.
+            Assert.That(store.GetPersonalBests(first), Is.EqualTo(new PersonalBests(0, false, false)));
+            Assert.That(store.GetPersonalBests(first).HasAnyNewBest, Is.False);
+
+            var better = store.Record(createMapScore("A", 0.95, -2, 2, -2, 2), relax, DateTimeOffset.Now)!;
+            var bests = store.GetPersonalBests(better);
+
+            Assert.That(bests.PreviousAttempts, Is.EqualTo(1));
+            Assert.That(bests.NewBestUnstableRate, Is.True);
+            Assert.That(bests.NewBestAccuracy, Is.True);
+            Assert.That(bests.HasAnyNewBest, Is.True);
+
+            var worse = store.Record(createMapScore("A", 0.92, -20, 20, -20, 20), relax, DateTimeOffset.Now)!;
+            Assert.That(store.GetPersonalBests(worse).HasAnyNewBest, Is.False);
+
+            // a different map, or a different kind of setup on the same map, is a separate record to beat.
+            var otherMap = store.Record(createMapScore("B", 0.50, -40, 40), relax, DateTimeOffset.Now)!;
+            Assert.That(store.GetPersonalBests(otherMap).PreviousAttempts, Is.EqualTo(0));
+
+            var manual = store.Record(createMapScore("A", 0.50, -40, 40), new AnarchySetupSnapshot(), DateTimeOffset.Now)!;
+            Assert.That(store.GetPersonalBests(manual).PreviousAttempts, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void TestPersonalBestsIgnoreLaterPlays()
+        {
+            using var storage = new TemporaryNativeStorage("session-stats-test");
+            var store = new SessionStatsStore(storage);
+            var setup = new AnarchySetupSnapshot();
+
+            var early = store.Record(createMapScore("A", 0.90, -5, 5), setup, DateTimeOffset.Now)!;
+            store.Record(createMapScore("A", 0.99, -1, 1), setup, DateTimeOffset.Now);
+
+            // the earlier play was a best at the time, whatever came after it.
+            Assert.That(store.GetPersonalBests(early).PreviousAttempts, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void TestAttemptsAreCountedPerMap()
+        {
+            using var storage = new TemporaryNativeStorage("session-stats-test");
+            var store = new SessionStatsStore(storage);
+
+            Assert.That(store.GetAttempts("A"), Is.EqualTo(0));
+            Assert.That(store.RegisterAttempt("A"), Is.EqualTo(1));
+            Assert.That(store.RegisterAttempt("A"), Is.EqualTo(2));
+            Assert.That(store.RegisterAttempt("B"), Is.EqualTo(1));
+            Assert.That(store.GetAttempts("A"), Is.EqualTo(2));
+
+            // a new session starts counting again.
+            Assert.That(new SessionStatsStore(storage).GetAttempts("A"), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void TestPlaysAreGroupedByMapMostRecentFirst()
+        {
+            using var storage = new TemporaryNativeStorage("session-stats-test");
+            var store = new SessionStatsStore(storage);
+            var setup = new AnarchySetupSnapshot();
+            var start = DateTimeOffset.Now.AddHours(-3);
+
+            store.Record(createMapScore("A", 0.90, 1, 2), setup, start);
+            store.Record(createMapScore("B", 0.90, 1, 2), setup, start.AddMinutes(10));
+            store.Record(createMapScore("A", 0.95, 1, 2), setup, start.AddMinutes(20));
+
+            var maps = MapGroup.Create(store.AllPlays);
+
+            Assert.That(maps, Has.Count.EqualTo(2));
+            Assert.That(maps[0].Plays, Has.Count.EqualTo(2));
+            Assert.That(maps[0].Plays[0].Accuracy, Is.EqualTo(0.90));
+            Assert.That(maps[0].Plays[1].Accuracy, Is.EqualTo(0.95));
+            Assert.That(maps[1].Plays, Has.Count.EqualTo(1));
         }
 
         [Test]

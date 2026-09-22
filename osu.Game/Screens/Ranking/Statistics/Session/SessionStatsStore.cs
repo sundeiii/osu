@@ -68,6 +68,65 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             }
         }
 
+        /// <summary>
+        /// Counts an attempt at the beatmap identified by <paramref name="beatmapKey"/> in the current session.
+        /// Unlike recorded plays, attempts include ones which were retried or quit before finishing.
+        /// </summary>
+        /// <returns>The number of this attempt, starting from 1.</returns>
+        public int RegisterAttempt(string beatmapKey)
+        {
+            int attempt;
+
+            lock (syncLock)
+            {
+                attempt = attempts.GetValueOrDefault(beatmapKey) + 1;
+                attempts[beatmapKey] = attempt;
+            }
+
+            AttemptRegistered?.Invoke(beatmapKey);
+            return attempt;
+        }
+
+        /// <summary>
+        /// Invoked, with the beatmap it was for, whenever <see cref="RegisterAttempt"/> counts an attempt.
+        /// May be invoked from any thread.
+        /// </summary>
+        public event Action<string>? AttemptRegistered;
+
+        /// <summary>
+        /// How many attempts at the beatmap identified by <paramref name="beatmapKey"/> have been made in the current session.
+        /// </summary>
+        public int GetAttempts(string beatmapKey)
+        {
+            lock (syncLock)
+                return attempts.GetValueOrDefault(beatmapKey);
+        }
+
+        /// <summary>
+        /// Checks whether <paramref name="play"/> beat every earlier play of the same beatmap with the same kind of setup.
+        /// </summary>
+        public PersonalBests GetPersonalBests(SessionPlayRecord play)
+        {
+            lock (syncLock)
+            {
+                int index = records.IndexOf(play);
+
+                var previous = records.Where((r, i) => (index < 0 || i < index)
+                                                       && r.ScoreID != play.ScoreID
+                                                       && r.Beatmap == play.Beatmap
+                                                       && r.Setup.GroupLabel == play.Setup.GroupLabel)
+                                     .ToList();
+
+                var previousUnstableRates = previous.Where(p => p.UnstableRate != null).Select(p => p.UnstableRate!.Value).ToList();
+
+                return new PersonalBests(
+                    previous.Count,
+                    play.UnstableRate != null && previousUnstableRates.Count > 0 && play.UnstableRate < previousUnstableRates.Min(),
+                    previous.Count > 0 && play.Accuracy > previous.Max(p => p.Accuracy));
+            }
+        }
+
+        private readonly Dictionary<string, int> attempts = new Dictionary<string, int>();
         private readonly Storage storage;
         private readonly List<SessionPlayRecord> records;
         private readonly object syncLock = new object();

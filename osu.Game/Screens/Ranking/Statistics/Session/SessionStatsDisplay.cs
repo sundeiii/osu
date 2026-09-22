@@ -5,12 +5,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
@@ -18,8 +24,8 @@ using osuTK.Graphics;
 namespace osu.Game.Screens.Ranking.Statistics.Session
 {
     /// <summary>
-    /// Shows how a set of plays went: summary numbers, unstable rate and accuracy trends,
-    /// the hit error distribution, and a comparison between setups.
+    /// Shows how a set of plays went: summary numbers, unstable rate and accuracy trends and,
+    /// when detailed, the hit error distribution, a comparison between setups and the individual plays.
     /// </summary>
     public partial class SessionStatsDisplay : CompositeDrawable
     {
@@ -29,18 +35,29 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
         [Resolved]
         private SessionStatsStore? store { get; set; }
 
+        [Resolved]
+        private OsuColour colours { get; set; } = null!;
+
         private readonly IReadOnlyList<SessionPlayRecord>? plays;
         private readonly bool detailed;
+        private readonly Action<SessionPlayRecord>? playClicked;
+
+        private readonly BindableBool exactSetups = new BindableBool();
+
+        private IReadOnlyList<SessionPlayRecord> shownPlays = null!;
+        private FillFlowContainer setupRows = null!;
 
         /// <param name="plays">The plays to show, oldest first. Defaults to the plays of the current session.</param>
         /// <param name="detailed">
         /// Whether to also show the combined hit error distribution, the comparison between setups and a list of individual plays.
         /// Leave off where a single play's own statistics are already shown next to it, like the results screen.
         /// </param>
-        public SessionStatsDisplay(IReadOnlyList<SessionPlayRecord>? plays = null, bool detailed = false)
+        /// <param name="playClicked">Invoked when a play in the list of individual plays is clicked. Only used when <paramref name="detailed"/>.</param>
+        public SessionStatsDisplay(IReadOnlyList<SessionPlayRecord>? plays = null, bool detailed = false, Action<SessionPlayRecord>? playClicked = null)
         {
             this.plays = plays;
             this.detailed = detailed;
+            this.playClicked = playClicked;
         }
 
         [BackgroundDependencyLoader]
@@ -49,7 +66,7 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
 
-            var shownPlays = plays ?? store?.CurrentSessionPlays ?? [];
+            shownPlays = plays ?? store?.CurrentSessionPlays ?? [];
             var summary = SessionSummary.Create(shownPlays);
 
             var table = new SimpleStatisticTable(2, new SimpleStatisticItem[]
@@ -62,16 +79,31 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 new TextItem("Total misses", summary.TotalMisses.ToString()),
             });
 
-            InternalChild = detailed ? createDetailed(shownPlays, summary, table) : createCompact(shownPlays, table);
+            InternalChild = detailed ? createDetailed(table) : createCompact(table);
         }
 
         /// <summary>
         /// A single short row, so the results screen (which already has plenty of other statistics) can still show everything on one screen.
         /// </summary>
-        private static Drawable createCompact(IReadOnlyList<SessionPlayRecord> shownPlays, Drawable table)
+        private Drawable createCompact(Drawable table)
         {
             if (shownPlays.Count == 0)
                 return table;
+
+            Drawable left = table;
+            var badges = createPersonalBestBadges();
+
+            if (badges != null)
+            {
+                left = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, 6),
+                    Children = new[] { badges, table },
+                };
+            }
 
             return new GridContainer
             {
@@ -90,17 +122,74 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                 {
                     new[]
                     {
-                        table,
+                        left,
                         new Container(),
-                        createUnstableRateChart(shownPlays, compact: true),
+                        createUnstableRateChart(compact: true),
                         new Container(),
-                        createAccuracyChart(shownPlays, compact: true),
+                        createAccuracyChart(compact: true),
                     }
                 },
             };
         }
 
-        private static Drawable createDetailed(IReadOnlyList<SessionPlayRecord> shownPlays, SessionSummary summary, Drawable table)
+        /// <summary>
+        /// Points out when the latest play of the session beat every earlier play of the same map and kind of setup.
+        /// Only shown for the current session, i.e. next to a play which has just finished.
+        /// </summary>
+        private Drawable? createPersonalBestBadges()
+        {
+            if (plays != null || store == null || shownPlays.Count == 0)
+                return null;
+
+            var personalBests = store.GetPersonalBests(shownPlays[^1]);
+
+            if (!personalBests.HasAnyNewBest)
+                return null;
+
+            var badges = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Horizontal,
+                Spacing = new Vector2(14, 0),
+            };
+
+            if (personalBests.NewBestUnstableRate)
+                badges.Add(createBadge("New best unstable rate on this map"));
+
+            if (personalBests.NewBestAccuracy)
+                badges.Add(createBadge("New best accuracy on this map"));
+
+            return badges;
+        }
+
+        private Drawable createBadge(string text) => new FillFlowContainer
+        {
+            AutoSizeAxes = Axes.Both,
+            Direction = FillDirection.Horizontal,
+            Spacing = new Vector2(5, 0),
+            Children = new Drawable[]
+            {
+                new SpriteIcon
+                {
+                    Icon = FontAwesome.Solid.Star,
+                    Size = new Vector2(12),
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Colour = colours.Yellow,
+                },
+                new OsuSpriteText
+                {
+                    Text = text,
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE, weight: FontWeight.Bold),
+                    Colour = colours.Yellow,
+                },
+            }
+        };
+
+        private Drawable createDetailed(Drawable table)
         {
             var flow = new FillFlowContainer
             {
@@ -114,23 +203,23 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             if (shownPlays.Count > 0)
             {
                 flow.Add(createTwoColumns(
-                    createUnstableRateChart(shownPlays, compact: false),
-                    createAccuracyChart(shownPlays, compact: false)));
+                    createUnstableRateChart(compact: false),
+                    createAccuracyChart(compact: false)));
 
                 flow.Add(createTwoColumns(
                     new HitErrorHistogramChart(SessionSummary.CombineHistograms(shownPlays)),
-                    createSetupComparison(summary)));
+                    createSetupComparison()));
 
-                flow.Add(createPlayList(shownPlays));
+                flow.Add(createPlayList());
             }
 
             return flow;
         }
 
-        private static SessionTrendChart createUnstableRateChart(IReadOnlyList<SessionPlayRecord> shownPlays, bool compact)
+        private SessionTrendChart createUnstableRateChart(bool compact)
             => new SessionTrendChart(compact ? "Unstable rate" : "Unstable rate (lower is better)", shownPlays, p => p.UnstableRate, v => v.ToString("N2"), lowerIsBetter: true, compact);
 
-        private static SessionTrendChart createAccuracyChart(IReadOnlyList<SessionPlayRecord> shownPlays, bool compact)
+        private SessionTrendChart createAccuracyChart(bool compact)
             => new SessionTrendChart("Accuracy", shownPlays, p => p.Accuracy, formatAccuracy, lowerIsBetter: false, compact);
 
         private static Drawable createTwoColumns(Drawable left, Drawable right) => new GridContainer
@@ -147,24 +236,60 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             Content = new[] { new[] { left, new Container(), right } },
         };
 
-        private static Drawable createSetupComparison(SessionSummary summary)
+        private Drawable createSetupComparison()
         {
-            var rows = new FillFlowContainer
+            setupRows = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Vertical,
                 Spacing = new Vector2(0, 4),
-                Child = new OsuSpriteText
-                {
-                    Text = "By setup",
-                    Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE, weight: FontWeight.SemiBold),
-                }
             };
 
-            foreach (var (label, setupSummary) in summary.BySetup)
+            exactSetups.BindValueChanged(_ => updateSetupRows(), true);
+
+            return new FillFlowContainer
             {
-                rows.Add(new OsuSpriteText
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 6),
+                Children = new Drawable[]
+                {
+                    new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Children = new Drawable[]
+                        {
+                            new OsuSpriteText
+                            {
+                                Text = "By setup",
+                                Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE, weight: FontWeight.SemiBold),
+                            },
+                            new OsuCheckbox
+                            {
+                                LabelText = "Exact settings",
+                                Current = exactSetups,
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.TopRight,
+                                Width = 180,
+                                RelativeSizeAxes = Axes.None,
+                            },
+                        }
+                    },
+                    setupRows,
+                }
+            };
+        }
+
+        private void updateSetupRows()
+        {
+            setupRows.Clear();
+
+            foreach (var (label, setupSummary) in SessionSummary.Create(shownPlays, exactSetups.Value).BySetup)
+            {
+                setupRows.Add(new OsuSpriteText
                 {
                     Text = $"{label}: {setupSummary.PlayCount} play{(setupSummary.PlayCount == 1 ? string.Empty : "s")}"
                            + $" · UR {formatNumber(setupSummary.AverageUnstableRate)}"
@@ -172,31 +297,29 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                     Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE),
                 });
             }
-
-            return rows;
         }
 
-        private static Drawable createPlayList(IReadOnlyList<SessionPlayRecord> allPlays)
+        private Drawable createPlayList()
         {
             var rows = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Vertical,
-                Spacing = new Vector2(0, 4),
+                Spacing = new Vector2(0, 2),
             };
 
             rows.Add(new OsuSpriteText
             {
-                Text = allPlays.Count > max_listed_plays ? $"Plays (latest {max_listed_plays} of {allPlays.Count})" : "Plays",
+                Text = shownPlays.Count > max_listed_plays ? $"Plays (latest {max_listed_plays} of {shownPlays.Count})" : "Plays",
                 Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE, weight: FontWeight.SemiBold),
             });
 
             rows.Add(createPlayRow("Time", "Beatmap", "Setup", "Accuracy", "UR", "Hit error", "Misses", isHeader: true));
 
-            foreach (var play in allPlays.Reverse().Take(max_listed_plays))
+            foreach (var play in shownPlays.Reverse().Take(max_listed_plays))
             {
-                rows.Add(createPlayRow(
+                var row = createPlayRow(
                     play.PlayedAt.LocalDateTime.ToString("d MMM HH:mm"),
                     play.Beatmap,
                     play.Setup.Label,
@@ -204,7 +327,10 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
                     formatNumber(play.UnstableRate),
                     formatHitError(play.AverageHitError),
                     play.MissCount.ToString(),
-                    isHeader: false));
+                    isHeader: false);
+
+                var captured = play;
+                rows.Add(new PlayRow(row, playClicked == null ? null : () => playClicked(captured)));
             }
 
             return rows;
@@ -279,6 +405,49 @@ namespace osu.Game.Screens.Ranking.Statistics.Session
             }
 
             protected override LocalisableString DisplayValue(string value) => value;
+        }
+
+        /// <summary>
+        /// A row of the play list, which lights up under the mouse and does something when clicked (if there is anything to do).
+        /// </summary>
+        private partial class PlayRow : OsuClickableContainer
+        {
+            private readonly Box highlight;
+
+            public PlayRow(Drawable content, Action? action)
+            {
+                RelativeSizeAxes = Axes.X;
+                AutoSizeAxes = Axes.Y;
+
+                if (action != null)
+                {
+                    Action = action;
+                    TooltipText = "Open this play";
+                }
+
+                Children = new[]
+                {
+                    highlight = new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.White,
+                        Alpha = 0,
+                    },
+                    content,
+                };
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                highlight.FadeTo(0.08f, 100);
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                base.OnHoverLost(e);
+                highlight.FadeOut(150);
+            }
         }
     }
 }

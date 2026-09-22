@@ -4,6 +4,7 @@
 using System;
 using System.Linq;
 using osu.Framework.Platform;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Scoring;
@@ -17,9 +18,10 @@ namespace osu.Game.Tests.Visual.Ranking
     /// </summary>
     internal static class SessionStatsTestHelper
     {
-        public static ScoreInfo CreateScore(Random random, double spread) => new ScoreInfo
+        public static ScoreInfo CreateScore(Random random, double spread, string? map = null) => new ScoreInfo
         {
             ID = Guid.NewGuid(),
+            BeatmapInfo = map == null ? null : new BeatmapInfo { DifficultyName = map },
             Ruleset = new OsuRuleset().RulesetInfo,
             Accuracy = 0.9 + random.NextDouble() * 0.09,
             MaxCombo = random.Next(50, 400),
@@ -39,7 +41,7 @@ namespace osu.Game.Tests.Visual.Ranking
                 double spread = 40 - i * 2.5;
                 var setup = new AnarchySetupSnapshot { Relax = i >= plays / 2, AimAssist = i >= plays / 2 };
 
-                store.Record(CreateScore(random, spread), setup, start.AddMinutes(i * 4));
+                store.Record(CreateScore(random, spread, i % 2 == 0 ? "Map A" : "Map B"), setup, start.AddMinutes(i * 4));
             }
         }
 

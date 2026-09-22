@@ -2,14 +2,19 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osuTK;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Screens.Ranking.Statistics.Session;
 
 namespace osu.Game.Tests.Visual.Ranking
@@ -50,6 +55,105 @@ namespace osu.Game.Tests.Visual.Ranking
             // the results screen has to fit this next to all its other statistics without scrolling, so it must stay one short row.
             AddAssert("compact view is one short row", () => this.ChildrenOfType<SessionStatsDisplay>().Single().DrawHeight < 100);
         }
+
+        [Test]
+        public void TestBestPlayIsStarredOnEachChart()
+        {
+            AddStep("show display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 6)));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+
+            AddAssert("each chart has exactly one star", () => this.ChildrenOfType<SessionTrendChart>().All(chart => chart.ChildrenOfType<SpriteIcon>().Count(i => i.Icon.Equals(FontAwesome.Solid.Star)) == 1));
+        }
+
+        [Test]
+        public void TestNewPersonalBestIsPointedOut()
+        {
+            AddStep("show display after a play which beat an earlier one", () =>
+            {
+                var store = new SessionStatsStore(LocalStorage.GetStorageForDirectory(Guid.NewGuid().ToString("N")));
+                var random = new Random(1);
+
+                store.Record(SessionStatsTestHelper.CreateScore(random, 60, "Map A"), new AnarchySetupSnapshot(), DateTimeOffset.Now.AddMinutes(-5));
+                store.Record(SessionStatsTestHelper.CreateScore(random, 2, "Map A"), new AnarchySetupSnapshot(), DateTimeOffset.Now);
+
+                showDisplay(store);
+            });
+
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("unstable rate badge shown", () => this.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "New best unstable rate on this map"));
+        }
+
+        [Test]
+        public void TestNoBadgeForAFirstPlayOrAWorsePlay()
+        {
+            AddStep("show display after a first play", () =>
+            {
+                var store = new SessionStatsStore(LocalStorage.GetStorageForDirectory(Guid.NewGuid().ToString("N")));
+                store.Record(SessionStatsTestHelper.CreateScore(new Random(1), 2, "Map A"), new AnarchySetupSnapshot(), DateTimeOffset.Now);
+
+                showDisplay(store);
+            });
+
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("no badge", () => !this.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString().StartsWith("New best", StringComparison.Ordinal)));
+        }
+
+        [Test]
+        public void TestClickingAPlayReportsIt()
+        {
+            SessionStatsStore store = null!;
+            SessionPlayRecord? clicked = null;
+
+            AddStep("show detailed display", () => showDisplay(store = createStore(pastSessions: 0, currentPlays: 4), detailed: true, playClicked: r => clicked = r));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+
+            AddAssert("a row per play can be clicked", () => playRows().Count == 4);
+
+            // rows are listed newest first.
+            AddStep("click the newest play", () => playRows().First().TriggerClick());
+            AddAssert("that play was reported", () => clicked?.ScoreID == store.CurrentSessionPlays.Last().ScoreID);
+
+            AddStep("click the oldest play", () => playRows().Last().TriggerClick());
+            AddAssert("that play was reported", () => clicked?.ScoreID == store.CurrentSessionPlays.First().ScoreID);
+        }
+
+        [Test]
+        public void TestPlaysCannotBeClickedWithoutAHandler()
+        {
+            AddStep("show detailed display", () => showDisplay(createStore(pastSessions: 0, currentPlays: 3), detailed: true));
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("no clickable rows", () => playRows().Count == 0);
+        }
+
+        [Test]
+        public void TestSetupsCanBeGroupedByFeatureOrExactSettings()
+        {
+            AddStep("show detailed display with two Timewarp speeds", () =>
+            {
+                var store = new SessionStatsStore(LocalStorage.GetStorageForDirectory(Guid.NewGuid().ToString("N")));
+                var random = new Random(1);
+
+                store.Record(SessionStatsTestHelper.CreateScore(random, 10, "Map A"), new AnarchySetupSnapshot { Relax = true, Timewarp = true, TimewarpRate = 1.1 }, DateTimeOffset.Now.AddMinutes(-2));
+                store.Record(SessionStatsTestHelper.CreateScore(random, 10, "Map A"), new AnarchySetupSnapshot { Relax = true, Timewarp = true, TimewarpRate = 1.25 }, DateTimeOffset.Now);
+
+                showDisplay(store, detailed: true);
+            });
+
+            AddUntilStep("display loaded", () => this.ChildrenOfType<SessionStatsDisplay>().SingleOrDefault()?.IsLoaded == true);
+            AddAssert("one row when grouped by feature", () => setupRowCount() == 1);
+
+            AddStep("ask for exact settings", () => this.ChildrenOfType<OsuCheckbox>().Single().Current.Value = true);
+            AddAssert("a row per exact setup", () => setupRowCount() == 2);
+
+            AddStep("go back to grouping by feature", () => this.ChildrenOfType<OsuCheckbox>().Single().Current.Value = false);
+            AddAssert("one row again", () => setupRowCount() == 1);
+        }
+
+        // rows of the play list which do something when clicked.
+        private List<OsuClickableContainer> playRows() => this.ChildrenOfType<OsuClickableContainer>().Where(c => c.TooltipText.ToString() == "Open this play").ToList();
+
+        // lines of the "by setup" comparison, which are the only texts in the display containing the average unstable rate.
+        private int setupRowCount() => this.ChildrenOfType<OsuSpriteText>().Count(t => t.Text.ToString().Contains("· UR", StringComparison.Ordinal));
 
         [Test]
         public void TestDetailedView()
@@ -117,7 +221,7 @@ namespace osu.Game.Tests.Visual.Ranking
         private SessionStatsStore createStore(int pastSessions, int currentPlays)
             => SessionStatsTestHelper.CreateStore(LocalStorage.GetStorageForDirectory(Guid.NewGuid().ToString("N")), pastSessions, currentPlays);
 
-        private void showDisplay(SessionStatsStore store, bool detailed = false) => Child = new DependencyProvidingContainer
+        private void showDisplay(SessionStatsStore store, bool detailed = false, Action<SessionPlayRecord>? playClicked = null) => Child = new DependencyProvidingContainer
         {
             RelativeSizeAxes = Axes.Both,
             CachedDependencies = new (Type, object)[] { (typeof(SessionStatsStore), store) },
@@ -131,7 +235,7 @@ namespace osu.Game.Tests.Visual.Ranking
                     Origin = Anchor.Centre,
                     Width = 1000,
                     AutoSizeAxes = Axes.Y,
-                    Child = new SessionStatsDisplay(detailed: detailed),
+                    Child = new SessionStatsDisplay(detailed: detailed, playClicked: playClicked),
                 }
             }
         };
