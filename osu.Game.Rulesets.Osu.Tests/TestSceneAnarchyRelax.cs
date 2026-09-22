@@ -72,7 +72,7 @@ namespace osu.Game.Rulesets.Osu.Tests
         [Test]
         public void TestHitErrorDistribution()
         {
-            CreateTest(() => AddStep("enable anarchy relax", () => LocalConfig.SetValue(OsuSetting.AnarchyRelax, true)));
+            CreateTest(() => AddStep("enable anarchy relax", () => enableRelax()));
 
             AddStep("park cursor on circles", () => InputManager.MoveMouseTo(Player.DrawableRuleset.Playfield.ToScreenSpace(circle_position)));
             AddUntilStep("wait for completion", () => Player.ScoreProcessor.HasCompleted.Value);
@@ -93,8 +93,41 @@ namespace osu.Game.Rulesets.Osu.Tests
             AddAssert("no early hits", () => getOffsets().Min(), () => Is.GreaterThanOrEqualTo(-0.5));
         }
 
+        [Test]
+        public void TestConfiguredOffsetDelaysClicks()
+        {
+            CreateTest(() => AddStep("enable anarchy relax with a late offset", () => enableRelax(offset: 12)));
+
+            AddStep("park cursor on circles", () => InputManager.MoveMouseTo(Player.DrawableRuleset.Playfield.ToScreenSpace(circle_position)));
+            AddUntilStep("wait for completion", () => Player.ScoreProcessor.HasCompleted.Value);
+
+            AddAssert("some circles hit", () => getOffsets().Count, () => Is.GreaterThan(0));
+
+            // with the offset left at zero clicks land right at the hit time, so nothing being this late means the setting was used.
+            AddAssert("no click before the configured offset", () => getOffsets().Min(), () => Is.GreaterThanOrEqualTo(11.5));
+        }
+
+        /// <summary>
+        /// Turns Relax on with the given timing.
+        /// </summary>
+        /// <remarks>
+        /// This sets the runtime state which gameplay reads directly, not the config it is normally derived from.
+        /// A config value only propagates when it changes, so one left over from an earlier test would stop it from being noticed.
+        /// </remarks>
+        private static void enableRelax(double offset = 0, double jitter = 0)
+        {
+            AnarchySettingsState.Relax = true;
+            AnarchySettingsState.RelaxOffset = offset;
+            AnarchySettingsState.RelaxJitter = jitter;
+        }
+
         [TearDown]
-        public void TearDown() => AnarchySettingsState.Relax = false;
+        public void TearDown()
+        {
+            AnarchySettingsState.Relax = false;
+            AnarchySettingsState.RelaxOffset = 0;
+            AnarchySettingsState.RelaxJitter = 0;
+        }
 
         private List<double> getOffsets(System.Func<HitEvent, bool> filter = null) => Player.ScoreProcessor.HitEvents
                                                    .Where(e => e.HitObject is HitCircle and not SliderEndCircle && e.Result.IsHit() && (filter?.Invoke(e) ?? true))

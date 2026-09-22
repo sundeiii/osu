@@ -192,6 +192,21 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.GameplayDisableWinKey, true);
 
             SetDefault(OsuSetting.AnarchyRelax, false);
+
+            SetDefault(
+                OsuSetting.AnarchyRelaxOffset,
+                0.0,
+                -12.0,
+                12.0,
+                0.5);
+
+            SetDefault(
+                OsuSetting.AnarchyRelaxJitter,
+                0.0,
+                0.0,
+                10.0,
+                0.5);
+
             SetDefault(OsuSetting.AnarchyRemoveHidden, false);
             SetDefault(OsuSetting.AnarchyTimewarpEnabled, false);
 
@@ -219,6 +234,14 @@ namespace osu.Game.Configuration
             // and keep it synchronised if config changes.
             GetBindable<bool>(OsuSetting.AnarchyRelax).BindValueChanged(
                 change => AnarchySettingsState.Relax = change.NewValue,
+                true);
+
+            GetBindable<double>(OsuSetting.AnarchyRelaxOffset).BindValueChanged(
+                change => AnarchySettingsState.RelaxOffset = change.NewValue,
+                true);
+
+            GetBindable<double>(OsuSetting.AnarchyRelaxJitter).BindValueChanged(
+                change => AnarchySettingsState.RelaxJitter = change.NewValue,
                 true);
 
             GetBindable<bool>(OsuSetting.AnarchyRemoveHidden).BindValueChanged(
@@ -514,6 +537,8 @@ namespace osu.Game.Configuration
         ExternalLinkWarning,
         PreferNoVideo,
         AnarchyRelax,
+        AnarchyRelaxOffset,
+        AnarchyRelaxJitter,
         AnarchyRemoveHidden,
         AnarchyTimewarpEnabled,
         AnarchyTimewarpRate,

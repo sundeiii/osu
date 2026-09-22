@@ -26,6 +26,10 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 AnarchySettingsStrings.Header,
                 AnarchySettingsStrings.Relax,
                 AnarchySettingsStrings.RelaxDescription,
+                AnarchySettingsStrings.RelaxOffset,
+                AnarchySettingsStrings.RelaxOffsetDescription,
+                AnarchySettingsStrings.RelaxJitter,
+                AnarchySettingsStrings.RelaxJitterDescription,
                 AnarchySettingsStrings.RemoveHidden,
                 AnarchySettingsStrings.RemoveHiddenDescription,
                 AnarchySettingsStrings.EnableTimewarp,
@@ -61,6 +65,12 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
         {
             Bindable<bool> relax =
                 config.GetBindable<bool>(OsuSetting.AnarchyRelax);
+
+            Bindable<double> relaxOffset =
+                config.GetBindable<double>(OsuSetting.AnarchyRelaxOffset);
+
+            Bindable<double> relaxJitter =
+                config.GetBindable<double>(OsuSetting.AnarchyRelaxJitter);
 
             Bindable<bool> removeHidden =
                 config.GetBindable<bool>(OsuSetting.AnarchyRemoveHidden);
@@ -129,6 +139,24 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Caption = AnarchySettingsStrings.Relax,
                     HintText = AnarchySettingsStrings.RelaxDescription,
                     Current = relax,
+                }),
+
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = AnarchySettingsStrings.RelaxOffset,
+                    HintText = AnarchySettingsStrings.RelaxOffsetDescription,
+                    Current = relaxOffset,
+                    KeyboardStep = 0.5f,
+                    LabelFormat = value => $"{value:+0.0;-0.0;0.0} ms",
+                }),
+
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = AnarchySettingsStrings.RelaxJitter,
+                    HintText = AnarchySettingsStrings.RelaxJitterDescription,
+                    Current = relaxJitter,
+                    KeyboardStep = 0.5f,
+                    LabelFormat = value => $"±{value:0.0} ms",
                 }),
 
                 new SettingsItemV2(new FormCheckBox

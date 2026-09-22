@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Osu.UI
             (OsuRulesetConfigManager)base.Config;
 
         // Hidden Relax state.
-        private const double relax_hit_offset = 0;
+        private readonly AnarchyRelaxTiming relaxTiming = new AnarchyRelaxTiming();
 
         private bool relaxWasEnabled;
         private bool relaxIsDown;
@@ -159,6 +159,9 @@ namespace osu.Game.Rulesets.Osu.UI
                     break;
                 }
 
+                if (drawable.Judged)
+                    forgetRelaxTiming(drawable);
+
                 /*
                  * Already judged, or beyond the object's
                  * hittable duration.
@@ -188,8 +191,8 @@ namespace osu.Game.Rulesets.Osu.UI
                          * head early, so only hold once the hit time is reached.
                          */
                         if (time >=
-                            slider.HitObject.StartTime +
-                            relax_hit_offset)
+                            getRelaxHitTime(
+                                slider.HeadCircle.HitObject))
                         {
                             requiresHold |=
                                 slider.SliderInputManager
@@ -230,8 +233,7 @@ namespace osu.Game.Rulesets.Osu.UI
                     return;
 
                 double hitTime =
-                    circle.HitObject.StartTime +
-                    relax_hit_offset;
+                    getRelaxHitTime(circle.HitObject);
 
                 if (time < hitTime)
                     return;
@@ -244,6 +246,20 @@ namespace osu.Game.Rulesets.Osu.UI
                         time -
                         circle.HitObject.StartTime);
             }
+        }
+
+        private double getRelaxHitTime(OsuHitObject hitObject) =>
+            relaxTiming.GetHitTime(
+                hitObject,
+                AnarchySettingsState.RelaxOffset,
+                AnarchySettingsState.RelaxJitter);
+
+        private void forgetRelaxTiming(DrawableOsuHitObject drawable)
+        {
+            relaxTiming.Forget(drawable.HitObject);
+
+            if (drawable is DrawableSlider slider)
+                relaxTiming.Forget(slider.HeadCircle.HitObject);
         }
 
         private void updateAnarchyAimCorrection()
@@ -295,8 +311,7 @@ namespace osu.Game.Rulesets.Osu.UI
             bool tooEarly =
                 AnarchySettingsState.Relax
                     ? time <
-                      targetCircle.HitObject.StartTime +
-                      relax_hit_offset
+                      getRelaxHitTime(targetCircle.HitObject)
                     : targetCircle.HitObject.StartTime - time >= 12;
 
             if (tooEarly)

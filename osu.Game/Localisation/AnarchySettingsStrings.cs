@@ -22,6 +22,22 @@ namespace osu.Game.Localisation
                 getKey(@"relax_description"),
                 @"Automatically presses gameplay buttons when the cursor is over a hittable object.");
 
+        public static LocalisableString RelaxOffset =>
+            new TranslatableString(getKey(@"relax_offset"), @"Relax click offset");
+
+        public static LocalisableString RelaxOffsetDescription =>
+            new TranslatableString(
+                getKey(@"relax_offset_description"),
+                @"When Relax clicks, relative to the hit time. Negative clicks earlier, positive later.");
+
+        public static LocalisableString RelaxJitter =>
+            new TranslatableString(getKey(@"relax_jitter"), @"Relax click jitter");
+
+        public static LocalisableString RelaxJitterDescription =>
+            new TranslatableString(
+                getKey(@"relax_jitter_description"),
+                @"Randomly moves each click by up to this much either way, so clicks are not perfectly consistent.");
+
         public static LocalisableString RemoveHidden =>
             new TranslatableString(getKey(@"remove_hidden"), @"Remove Hidden");
 
