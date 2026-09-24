@@ -150,7 +150,7 @@ namespace osu.Game.Audio
             protected override Track? GetTrack()
             {
                 string previewUrl =
-                    $"https://b.rinarii.de/preview/{beatmapSetInfo.OnlineID}.mp3";
+                    $"https://b.rinarii.xyz/preview/{beatmapSetInfo.OnlineID}.mp3";
 
                 return trackManager.Get(previewUrl);
             }

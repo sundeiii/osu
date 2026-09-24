@@ -27,7 +27,7 @@ namespace osu.Game.Beatmaps
     /// </remarks>
     public partial class RinariBeatmapStatusSynchroniser : Component
     {
-        private const string status_endpoint = "https://lazer-api.rinarii.de/api/v2/rinari/beatmapset-statuses";
+        private const string status_endpoint = "https://lazer-api.rinarii.xyz/api/v2/rinari/beatmapset-statuses";
 
         /// <summary>
         /// How long to wait after the last queued request before actually syncing, so that importing many

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Text.RegularExpressions;
 using osu.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
@@ -34,6 +35,21 @@ namespace osu.Game.Configuration
         public OsuConfigManager(Storage storage)
             : base(storage)
         {
+            migrateCustomApiUrl();
+        }
+
+        /// <summary>
+        /// The server moved from rinarii.de to rinarii.xyz. The default only applies to configs which have nothing saved,
+        /// so a saved URL on the old domain would otherwise keep pointing at a host which no longer exists.
+        /// </summary>
+        private void migrateCustomApiUrl()
+        {
+            var customApiUrl = GetBindable<string>(OsuSetting.CustomApiUrl);
+
+            if (string.IsNullOrEmpty(customApiUrl.Value))
+                return;
+
+            customApiUrl.Value = Regex.Replace(customApiUrl.Value, @"\brinarii\.de\b", "rinarii.xyz", RegexOptions.IgnoreCase);
         }
 
         protected override void InitialiseDefaults()
@@ -114,7 +130,7 @@ namespace osu.Game.Configuration
                 }
             };
 
-            SetDefault(OsuSetting.CustomApiUrl, "lazer-api.rinarii.de");
+            SetDefault(OsuSetting.CustomApiUrl, "lazer-api.rinarii.xyz");
 
             SetDefault(OsuSetting.ExternalLinkWarning, true);
             SetDefault(OsuSetting.PreferNoVideo, false);

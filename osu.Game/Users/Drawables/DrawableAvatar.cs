@@ -37,7 +37,7 @@ namespace osu.Game.Users.Drawables
             if (user != null && user.OnlineID > APIUser.SYSTEM_USER_ID)
                 // TODO: The fallback here should not need to exist. Users should be looked up and populated via UserLookupCache or otherwise
                 // in remaining cases where this is required (chat tabs, local leaderboard), at which point this should be removed.
-                Texture = onlineTextures.Get((user as APIUser)?.AvatarUrl ?? $@"https://a.rinarii.de/{user.OnlineID}");
+                Texture = onlineTextures.Get((user as APIUser)?.AvatarUrl ?? $@"https://a.rinarii.xyz/{user.OnlineID}");
 
             Texture ??= textures.Get(@"Online/avatar-guest");
         }
